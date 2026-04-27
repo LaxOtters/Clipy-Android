@@ -1,0 +1,3 @@
+import convention.configureRoomAndroid
+
+configureRoomAndroid()
