@@ -23,8 +23,16 @@ dependencyResolutionManagement {
 rootProject.name = "Clipy"
 include(":app")
 include(":domain")
-include(":data:storage")
-include(":data:session")
-include(":core:designsystem")
-include(":core:navigation")
-include(":core:ui")
+
+include(
+    ":data:storage",
+    ":data:session",
+)
+
+include(
+    ":core:designsystem",
+    ":core:navigation",
+    ":core:ui",
+)
+
+include(":feature:main")
