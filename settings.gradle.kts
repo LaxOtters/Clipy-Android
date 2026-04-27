@@ -22,4 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Clipy"
 include(":app")
- 
+include(":domain")
