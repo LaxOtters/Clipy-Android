@@ -34,7 +34,6 @@ room = "2.8.4"
 coil = "2.7.0"
 
 # Testing
-junit4 = "4.13.2"
 junit5 = "6.0.3"
 androidxJunit = "1.3.0"
 espressoCore = "3.7.0"
@@ -102,7 +101,6 @@ androidx-room-testing = { group = "androidx.room", name = "room-testing", versio
 inject = "javax.inject:javax.inject:1"
 
 # Testing
-junit = { group = "junit", name = "junit", version.ref = "junit4" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit5" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
