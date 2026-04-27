@@ -1,6 +1,5 @@
 plugins {
     id("clipy.android.application")
-    id("clipy.android.compose")
     id("clipy.android.hilt")
 }
 
@@ -35,8 +34,6 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:designsystem"))
     implementation(project(":feature:main"))
-
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.activity.compose)
 }

@@ -5,3 +5,7 @@ plugins {
 }
 
 setNamespace("feature.main")
+
+dependencies {
+    implementation(libs.androidx.activity.compose)
+}
