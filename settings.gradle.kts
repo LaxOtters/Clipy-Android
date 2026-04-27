@@ -24,3 +24,4 @@ rootProject.name = "Clipy"
 include(":app")
 include(":domain")
 include(":data:storage")
+include(":data:session")
