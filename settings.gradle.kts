@@ -35,4 +35,7 @@ include(
     ":core:ui",
 )
 
-include(":feature:main")
+include(
+    ":feature:main",
+    ":feature:home",
+)
