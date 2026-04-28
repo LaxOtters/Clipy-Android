@@ -6,3 +6,7 @@ plugins {
 }
 
 setNamespace("core.ui")
+
+dependencies {
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+}
