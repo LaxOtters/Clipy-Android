@@ -1,0 +1,3 @@
+import convention.configureHiltKotlin
+
+configureHiltKotlin()

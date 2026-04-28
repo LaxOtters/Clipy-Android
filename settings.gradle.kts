@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
             content {
@@ -21,4 +22,20 @@ dependencyResolutionManagement {
 
 rootProject.name = "Clipy"
 include(":app")
- 
+include(":domain")
+
+include(
+    ":data:storage",
+    ":data:session",
+)
+
+include(
+    ":core:designsystem",
+    ":core:navigation",
+    ":core:ui",
+)
+
+include(
+    ":feature:main",
+    ":feature:home",
+)

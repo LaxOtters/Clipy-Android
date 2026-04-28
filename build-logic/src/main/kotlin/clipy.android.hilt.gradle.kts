@@ -1,0 +1,3 @@
+import convention.configureHiltAndroid
+
+configureHiltAndroid()
