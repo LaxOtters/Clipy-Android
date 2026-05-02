@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+if ! ./gradlew ktlintCheck; then
+  printf '\n[pre-commit] ktlintCheck failed. Commit aborted.\n'
+  printf 'Fix automatically: ./gradlew ktlintFormat\n'
+  printf 'Check manually: ./gradlew ktlintCheck\n\n'
+  exit 1
+fi
