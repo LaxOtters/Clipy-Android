@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+if ! ./gradlew detekt testDebugUnitTest; then
+  printf '\n[pre-push] verification failed. Push aborted.\n'
+  printf 'Check manually: ./gradlew detekt testDebugUnitTest\n\n'
+  exit 1
+fi

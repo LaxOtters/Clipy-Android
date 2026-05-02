@@ -9,5 +9,7 @@ dependencies {
     implementation(libs.gradle.hilt.plugin)
     implementation(libs.gradle.ksp.plugin)
     implementation(libs.gradle.room.plugin)
+    implementation(libs.detekt.gradle.plugin)
+    implementation(libs.ktlint.gradle.plugin)
     compileOnly(libs.gradle.compose.compiler.plugin)
 }
