@@ -116,6 +116,9 @@ style:
     max: 2
   UnnecessaryLet:
     active: true
+  UnusedPrivateMember:
+    active: true
+    allowedNames: ".*Preview"
 
 potential-bugs:
   active: true
