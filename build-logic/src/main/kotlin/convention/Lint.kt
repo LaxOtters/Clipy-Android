@@ -21,12 +21,10 @@ internal fun Project.configureDetekt() {
         jvmTarget = "17"
 
         reports {
-            html.required.set(true)
-            html.outputLocation.set(rootProject.layout.buildDirectory.file("reports/detekt/${project.name}.html"))
+            html.required.set(false)
             xml.required.set(false)
             txt.required.set(false)
-            sarif.required.set(true)
-            sarif.outputLocation.set(rootProject.layout.buildDirectory.file("reports/detekt/${project.name}.sarif"))
+            sarif.required.set(false)
             md.required.set(false)
         }
     }
