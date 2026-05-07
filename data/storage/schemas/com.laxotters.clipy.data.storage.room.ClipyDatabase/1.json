@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "ee79f6aff45380a5e919b93d219b734e",
+    "identityHash": "69f209037e986719733752989b05b4f4",
     "entities": [
       {
         "tableName": "sessions",
@@ -311,11 +311,59 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "session_view_states",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sessionId` TEXT NOT NULL, `lastWebUrl` TEXT, `bottomSheetState` TEXT NOT NULL, `lastOpenedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`sessionId`), FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastWebUrl",
+            "columnName": "lastWebUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bottomSheetState",
+            "columnName": "bottomSheetState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastOpenedAtMillis",
+            "columnName": "lastOpenedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sessionId"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ee79f6aff45380a5e919b93d219b734e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '69f209037e986719733752989b05b4f4')"
     ]
   }
 }
