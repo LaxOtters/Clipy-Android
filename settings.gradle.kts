@@ -30,6 +30,7 @@ include(
 )
 
 include(
+    ":core:common",
     ":core:designsystem",
     ":core:navigation",
     ":core:ui",
