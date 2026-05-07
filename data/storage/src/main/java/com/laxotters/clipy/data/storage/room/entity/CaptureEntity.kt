@@ -22,7 +22,8 @@ import androidx.room.PrimaryKey
 data class CaptureEntity(
     @PrimaryKey val id: String,
     val itemId: String,
-    val imageRemoteUrl: String,
+    // TODO: 이미지 업로드 도입 시 remoteUrl nullable 정책 재검토
+    val imageRemoteUrl: String?,
     val imageLocalPath: String?,
     val capturedAtMillis: Long,
     val memo: String?,
