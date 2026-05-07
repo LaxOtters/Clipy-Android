@@ -42,12 +42,12 @@ class SessionDaoTest {
     }
 
     @Test(expected = SQLiteConstraintException::class)
-    fun insertItem_withUnknownSessionId_throwsConstraintException() = runBlocking {
+    fun unknownSessionId_insertItem_throwsConstraintException() = runBlocking {
         sessionDao.insertItem(itemEntity(id = "item-1", sessionId = "unknown-session"))
     }
 
     @Test
-    fun getSessions_returnsSessionsByUpdatedAtDescending() = runBlocking {
+    fun savedSessions_getSessions_returnsUpdatedAtDescending() = runBlocking {
         sessionDao.insertSession(sessionEntity(id = "session-old", updatedAtMillis = 1_000L))
         sessionDao.insertSession(sessionEntity(id = "session-new", updatedAtMillis = 2_000L))
 
@@ -57,7 +57,7 @@ class SessionDaoTest {
     }
 
     @Test
-    fun getSessionWithDetails_returnsSessionItemsCapturesAndDecisions() = runBlocking {
+    fun savedSessionDetails_getSessionWithDetails_returnsSessionItemsCapturesAndDecisions() = runBlocking {
         insertSessionGraph()
 
         val sessionWithDetails = requireNotNull(sessionDao.getSessionWithDetails("session-1"))
@@ -71,7 +71,7 @@ class SessionDaoTest {
     }
 
     @Test
-    fun deleteSession_deletesItemsCapturesAndDecisions() = runBlocking {
+    fun savedSessionDetails_deleteSession_deletesItemsCapturesAndDecisions() = runBlocking {
         insertSessionGraph()
 
         sessionDao.deleteSession("session-1")
@@ -84,7 +84,7 @@ class SessionDaoTest {
     }
 
     @Test
-    fun deleteItem_deletesOnlyItsCapturesAndDecisions() = runBlocking {
+    fun savedSessionDetails_deleteItem_deletesOnlyItsCapturesAndDecisions() = runBlocking {
         insertSessionGraph()
 
         sessionDao.deleteItem("item-1")
