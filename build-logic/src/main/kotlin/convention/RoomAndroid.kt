@@ -20,5 +20,7 @@ internal fun Project.configureRoomAndroid() {
         add("implementation", libs.findLibrary("androidx-room-ktx").get())
         add("ksp", libs.findLibrary("androidx-room-compiler").get())
         add("testImplementation", libs.findLibrary("androidx-room-testing").get())
+        add("testImplementation", libs.findLibrary("androidx-test-core").get())
+        add("testImplementation", libs.findLibrary("robolectric").get())
     }
 }
