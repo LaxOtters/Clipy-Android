@@ -17,13 +17,13 @@ interface SessionDao {
     suspend fun insertSession(session: SessionEntity)
 
     @Insert
-    suspend fun insertItem(item: ItemEntity)
+    suspend fun insertItems(items: List<ItemEntity>)
 
     @Insert
-    suspend fun insertCapture(capture: CaptureEntity)
+    suspend fun insertCaptures(captures: List<CaptureEntity>)
 
     @Insert
-    suspend fun insertDecision(decision: DecisionEntity)
+    suspend fun insertDecisions(decisions: List<DecisionEntity>)
 
     @Transaction
     @Query("SELECT * FROM sessions WHERE id = :sessionId")
