@@ -43,7 +43,7 @@ class SessionDaoTest {
 
     @Test(expected = SQLiteConstraintException::class)
     fun unknownSessionId_insertItem_throwsConstraintException() = runBlocking {
-        sessionDao.insertItem(itemEntity(id = "item-1", sessionId = "unknown-session"))
+        sessionDao.insertItems(listOf(itemEntity(id = "item-1", sessionId = "unknown-session")))
     }
 
     @Test
@@ -102,12 +102,24 @@ class SessionDaoTest {
 
     private suspend fun insertSessionGraph() {
         sessionDao.insertSession(sessionEntity(id = "session-1"))
-        sessionDao.insertItem(itemEntity(id = "item-1", sessionId = "session-1"))
-        sessionDao.insertItem(itemEntity(id = "item-2", sessionId = "session-1"))
-        sessionDao.insertCapture(captureEntity(id = "capture-1", itemId = "item-1"))
-        sessionDao.insertCapture(captureEntity(id = "capture-2", itemId = "item-2"))
-        sessionDao.insertDecision(decisionEntity(id = "decision-1", sessionId = "session-1", itemId = "item-1"))
-        sessionDao.insertDecision(decisionEntity(id = "decision-2", sessionId = "session-1", itemId = "item-2"))
+        sessionDao.insertItems(
+            listOf(
+                itemEntity(id = "item-1", sessionId = "session-1"),
+                itemEntity(id = "item-2", sessionId = "session-1"),
+            ),
+        )
+        sessionDao.insertCaptures(
+            listOf(
+                captureEntity(id = "capture-1", itemId = "item-1"),
+                captureEntity(id = "capture-2", itemId = "item-2"),
+            ),
+        )
+        sessionDao.insertDecisions(
+            listOf(
+                decisionEntity(id = "decision-1", sessionId = "session-1", itemId = "item-1"),
+                decisionEntity(id = "decision-2", sessionId = "session-1", itemId = "item-2"),
+            ),
+        )
     }
 
     private fun sessionEntity(
