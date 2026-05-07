@@ -1,4 +1,4 @@
-package com.laxotters.clipy.core.common.model
+package com.laxotters.clipy.domain.model
 
 import java.time.Instant
 import java.util.UUID
