@@ -5,13 +5,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
+import com.laxotters.clipy.feature.home.HomeRoute
+import com.laxotters.clipy.feature.session.SessionRoute
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -21,29 +24,45 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ClipyTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding),
-                    )
-                }
+                ClipyApp()
             }
         }
     }
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier,
-    )
+private fun ClipyApp(modifier: Modifier = Modifier) {
+    var sessionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var initialUrl by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val selectedSessionId = sessionId
+    val selectedInitialUrl = initialUrl
+
+    if (selectedSessionId != null && selectedInitialUrl != null) {
+        SessionRoute(
+            sessionId = selectedSessionId,
+            initialUrl = selectedInitialUrl,
+            onHomeClick = {
+                sessionId = null
+                initialUrl = null
+            },
+            modifier = modifier.fillMaxSize(),
+        )
+    } else {
+        HomeRoute(
+            onSessionClick = { nextSessionId, nextInitialUrl ->
+                sessionId = nextSessionId
+                initialUrl = nextInitialUrl
+            },
+            modifier = modifier.fillMaxSize(),
+        )
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun GreetingPreview() {
+private fun ClipyAppPreview() {
     ClipyTheme {
-        Greeting("Android")
+        ClipyApp()
     }
 }

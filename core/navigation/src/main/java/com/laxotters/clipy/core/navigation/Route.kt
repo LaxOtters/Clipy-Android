@@ -1,8 +1,16 @@
 package com.laxotters.clipy.core.navigation
 
+import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
-sealed interface Route {
+@Serializable
+sealed interface Route : NavKey {
     @Serializable
     data object Home : Route
+
+    @Serializable
+    data class Session(
+        val sessionId: String,
+        val initialUrl: String,
+    ) : Route
 }
