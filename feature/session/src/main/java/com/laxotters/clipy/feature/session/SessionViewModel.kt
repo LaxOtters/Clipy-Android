@@ -9,7 +9,7 @@ class SessionViewModel @Inject constructor() :
     BaseViewModel<SessionUiState, SessionUiEvent, SessionUiSideEffect>(SessionUiState()) {
     override fun handleEvent(event: SessionUiEvent) {
         when (event) {
-            is SessionUiEvent.Entered -> updateState {
+            is SessionUiEvent.ScreenEntered -> updateState {
                 if (sessionId == event.sessionId && currentUrl.isNotBlank()) {
                     this
                 } else {
@@ -22,7 +22,7 @@ class SessionViewModel @Inject constructor() :
                 }
             }
 
-            is SessionUiEvent.WebPageStateChanged -> updateState {
+            is SessionUiEvent.PageLoaded -> updateState {
                 copy(
                     currentUrl = event.url,
                     canGoBack = event.canGoBack,

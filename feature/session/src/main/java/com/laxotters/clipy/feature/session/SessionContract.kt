@@ -12,12 +12,12 @@ data class SessionUiState(
 ) : UiState
 
 sealed interface SessionUiEvent : UiEvent {
-    data class Entered(
+    data class ScreenEntered(
         val sessionId: String,
         val initialUrl: String,
     ) : SessionUiEvent
 
-    data class WebPageStateChanged(
+    data class PageLoaded(
         val url: String,
         val canGoBack: Boolean,
         val canGoForward: Boolean,

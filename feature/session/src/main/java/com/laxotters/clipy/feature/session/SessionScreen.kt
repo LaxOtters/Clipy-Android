@@ -52,7 +52,7 @@ fun SessionRoute(
 
     LaunchedEffect(sessionId, initialUrl) {
         viewModel.dispatch(
-            SessionUiEvent.Entered(
+            SessionUiEvent.ScreenEntered(
                 sessionId = sessionId,
                 initialUrl = initialUrl,
             ),
@@ -73,7 +73,7 @@ fun SessionRoute(
                 controller = webViewController,
                 onPageStateChanged = { url, canGoBack, canGoForward ->
                     viewModel.dispatch(
-                        SessionUiEvent.WebPageStateChanged(
+                        SessionUiEvent.PageLoaded(
                             url = url,
                             canGoBack = canGoBack,
                             canGoForward = canGoForward,
