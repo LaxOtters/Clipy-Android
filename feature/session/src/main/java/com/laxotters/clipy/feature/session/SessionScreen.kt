@@ -1,5 +1,6 @@
 package com.laxotters.clipy.feature.session
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,6 +60,12 @@ fun SessionRoute(
         )
     }
 
+    SessionBackHandler(
+        canGoBack = screenState.canGoBack,
+        onWebViewBack = webViewController::goBack,
+        onSessionExit = onHomeClick,
+    )
+
     SessionScreen(
         state = screenState,
         actions = SessionScreenActions(
@@ -85,6 +92,21 @@ fun SessionRoute(
         },
         modifier = modifier,
     )
+}
+
+@Composable
+private fun SessionBackHandler(
+    canGoBack: Boolean,
+    onWebViewBack: () -> Unit,
+    onSessionExit: () -> Unit,
+) {
+    BackHandler {
+        if (canGoBack) {
+            onWebViewBack()
+        } else {
+            onSessionExit()
+        }
+    }
 }
 
 private data class SessionScreenActions(

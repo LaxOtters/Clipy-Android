@@ -7,5 +7,6 @@ plugins {
 setNamespace("feature.session")
 
 dependencies {
+    implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation3.runtime)
 }
