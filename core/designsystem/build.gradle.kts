@@ -6,3 +6,7 @@ plugins {
 }
 
 setNamespace("core.designsystem")
+
+dependencies {
+    testImplementation(libs.junit)
+}
