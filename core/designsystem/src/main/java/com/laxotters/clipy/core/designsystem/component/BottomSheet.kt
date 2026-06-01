@@ -1,11 +1,16 @@
 package com.laxotters.clipy.core.designsystem.component
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -19,8 +24,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -33,17 +40,26 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
 
 @Composable
 fun ClipyBottomSheetLayout(
     value: ClipyBottomSheetValue,
+    onValueChange: (ClipyBottomSheetValue) -> Unit,
     modifier: Modifier = Modifier,
     headerContent: @Composable ColumnScope.(ClipyBottomSheetValue) -> Unit = {},
     sheetContent: @Composable ColumnScope.(ClipyBottomSheetValue) -> Unit,
 ) {
+    val dragController = remember { ClipyBottomSheetDragController() }
     var layoutHeightPx by remember { mutableFloatStateOf(0f) }
     val policy = rememberClipyBottomSheetPolicy(layoutHeightPx)
-    val offsetY = policy.offsetFor(value)
+    val targetOffset = policy.offsetFor(value)
+
+    LaunchedEffect(layoutHeightPx, policy, value) {
+        if (layoutHeightPx > 0f) {
+            dragController.syncTo(targetOffset)
+        }
+    }
 
     Box(
         modifier = modifier
@@ -54,9 +70,31 @@ fun ClipyBottomSheetLayout(
     ) {
         if (layoutHeightPx > 0f) {
             ClipyBottomSheetSurface(
-                value = value,
-                offsetY = offsetY,
-                hiddenOffset = policy.offsetFor(ClipyBottomSheetValue.HIDDEN),
+                presentation = ClipyBottomSheetPresentation(
+                    value = value,
+                    offsetY = dragController.displayedOffset(targetOffset),
+                    isDragging = dragController.isDragging,
+                    dragTranslationY = dragController.dragTranslationY,
+                    settlingTargetValue = dragController.settlingTargetValue,
+                ),
+                policy = policy,
+                dragCallbacks = ClipyBottomSheetDragCallbacks(
+                    onDragStarted = { dragController.startDrag() },
+                    onDrag = { delta ->
+                        dragController.dragBy(
+                            delta = delta,
+                            policy = policy,
+                        )
+                    },
+                    onDragStopped = { velocity ->
+                        dragController.settle(
+                            currentValue = value,
+                            velocity = velocity,
+                            policy = policy,
+                            onValueChange = onValueChange,
+                        )
+                    },
+                ),
                 headerContent = headerContent,
                 sheetContent = sheetContent,
             )
@@ -92,17 +130,27 @@ private fun rememberClipyBottomSheetPolicy(
 
 @Composable
 private fun ClipyBottomSheetSurface(
-    value: ClipyBottomSheetValue,
-    offsetY: Float,
-    hiddenOffset: Float,
+    presentation: ClipyBottomSheetPresentation,
+    policy: ClipyBottomSheetPolicy,
+    dragCallbacks: ClipyBottomSheetDragCallbacks,
     modifier: Modifier = Modifier,
     headerContent: @Composable ColumnScope.(ClipyBottomSheetValue) -> Unit,
     sheetContent: @Composable ColumnScope.(ClipyBottomSheetValue) -> Unit,
 ) {
+    val valueForContent = policy.valueForContent(
+        ClipyBottomSheetContentContext(
+            currentValue = presentation.value,
+            offsetY = presentation.offsetY,
+            translationY = presentation.dragTranslationY,
+            isDragging = presentation.isDragging,
+            settlingTargetValue = presentation.settlingTargetValue,
+        ),
+    )
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .offsetY(offsetY)
+            .offsetY(presentation.offsetY)
             .shadow(
                 elevation = ClipyBottomSheetDefaults.SheetElevation,
                 shape = ClipyBottomSheetDefaults.SheetShape,
@@ -111,22 +159,43 @@ private fun ClipyBottomSheetSurface(
             .background(
                 color = MaterialTheme.colorScheme.surface,
                 shape = ClipyBottomSheetDefaults.SheetShape,
+            )
+            .draggable(
+                orientation = Orientation.Vertical,
+                state = rememberDraggableState(onDelta = dragCallbacks.onDrag),
+                enabled = presentation.value != ClipyBottomSheetValue.HIDDEN,
+                onDragStarted = { dragCallbacks.onDragStarted() },
+                onDragStopped = dragCallbacks.onDragStopped,
             ),
     ) {
-        if (value != ClipyBottomSheetValue.HIDDEN) {
+        if (presentation.value != ClipyBottomSheetValue.HIDDEN) {
             ClipyBottomSheetHandle()
         }
-        headerContent(value)
+        headerContent(valueForContent)
         ClipyBottomSheetAnimatedContent(
-            valueForContent = value,
+            valueForContent = valueForContent,
             sheetContent = sheetContent,
         )
         ClipyBottomSheetBottomSpacer(
-            hiddenOffset = hiddenOffset,
-            offsetY = offsetY,
+            hiddenOffset = policy.offsetFor(ClipyBottomSheetValue.HIDDEN),
+            offsetY = presentation.offsetY,
         )
     }
 }
+
+private data class ClipyBottomSheetPresentation(
+    val value: ClipyBottomSheetValue,
+    val offsetY: Float,
+    val isDragging: Boolean,
+    val dragTranslationY: Float,
+    val settlingTargetValue: ClipyBottomSheetValue?,
+)
+
+private data class ClipyBottomSheetDragCallbacks(
+    val onDragStarted: () -> Unit,
+    val onDrag: (Float) -> Unit,
+    val onDragStopped: suspend CoroutineScope.(Float) -> Unit,
+)
 
 @Composable
 private fun ClipyBottomSheetAnimatedContent(
@@ -168,6 +237,95 @@ private fun ClipyBottomSheetBottomSpacer(
             },
         ),
     )
+}
+
+private class ClipyBottomSheetDragController {
+    private var currentOffsetY by mutableFloatStateOf(0f)
+    private val offsetYAnimatable = Animatable(0f)
+    private var isPositionInitialized by mutableStateOf(false)
+
+    var isDragging by mutableStateOf(false)
+        private set
+
+    var dragTranslationY by mutableFloatStateOf(0f)
+        private set
+
+    var isSettling by mutableStateOf(false)
+        private set
+
+    var settlingTargetValue by mutableStateOf<ClipyBottomSheetValue?>(null)
+        private set
+
+    fun displayedOffset(targetOffset: Float): Float = when {
+        !isPositionInitialized -> targetOffset
+        isSettling -> offsetYAnimatable.value
+        else -> currentOffsetY
+    }
+
+    fun startDrag() {
+        settlingTargetValue = null
+        dragTranslationY = 0f
+        isDragging = true
+    }
+
+    fun dragBy(
+        delta: Float,
+        policy: ClipyBottomSheetPolicy,
+    ) {
+        dragTranslationY += delta
+        currentOffsetY = policy.clampOffsetY(currentOffsetY + delta)
+    }
+
+    suspend fun syncTo(targetOffset: Float) {
+        if (!isPositionInitialized) {
+            offsetYAnimatable.snapTo(targetOffset)
+            currentOffsetY = targetOffset
+            isPositionInitialized = true
+        } else if (currentOffsetY != targetOffset) {
+            settlingTargetValue = null
+            isSettling = true
+            offsetYAnimatable.stop()
+            offsetYAnimatable.snapTo(currentOffsetY)
+            offsetYAnimatable.animateTo(
+                targetValue = targetOffset,
+                animationSpec = spring(),
+            )
+            currentOffsetY = offsetYAnimatable.value
+            isSettling = false
+        }
+    }
+
+    suspend fun settle(
+        currentValue: ClipyBottomSheetValue,
+        velocity: Float,
+        policy: ClipyBottomSheetPolicy,
+        onValueChange: (ClipyBottomSheetValue) -> Unit,
+    ) {
+        val targetValue = policy.targetValue(
+            from = currentValue,
+            dragEnd = ClipyBottomSheetDragEnd(
+                translationY = dragTranslationY,
+                velocityY = velocity,
+                endOffsetY = currentOffsetY,
+            ),
+        )
+
+        settlingTargetValue = targetValue
+        isDragging = false
+        dragTranslationY = 0f
+        if (targetValue != currentValue) {
+            onValueChange(targetValue)
+        }
+        isSettling = true
+        offsetYAnimatable.snapTo(currentOffsetY)
+        offsetYAnimatable.animateTo(
+            targetValue = policy.offsetFor(targetValue),
+            animationSpec = spring(),
+        )
+        currentOffsetY = offsetYAnimatable.value
+        isSettling = false
+        settlingTargetValue = null
+    }
 }
 
 @Composable
@@ -237,6 +395,7 @@ private fun ClipyBottomSheetPreviewContent(value: ClipyBottomSheetValue) {
         ) {
             ClipyBottomSheetLayout(
                 value = value,
+                onValueChange = {},
                 sheetContent = { targetValue ->
                     ClipyBottomSheetPreviewSheetContent(value = targetValue)
                 },
