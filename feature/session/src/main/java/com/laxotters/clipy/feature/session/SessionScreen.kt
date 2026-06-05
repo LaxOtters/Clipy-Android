@@ -7,14 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -32,7 +30,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetLayout
+import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetValue
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
+import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.webview.SessionWebView
 import com.laxotters.clipy.feature.session.webview.rememberSessionWebViewController
 
@@ -40,12 +41,13 @@ import com.laxotters.clipy.feature.session.webview.rememberSessionWebViewControl
 fun SessionRoute(
     sessionId: String,
     initialUrl: String,
-    modifier: Modifier = Modifier,
     onHomeClick: () -> Unit = {},
+    modifier: Modifier = Modifier,
     viewModel: SessionViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val webViewController = rememberSessionWebViewController()
+
     val screenState = state.copy(
         sessionId = state.sessionId.ifBlank { sessionId },
         currentUrl = state.currentUrl.ifBlank { initialUrl.ifBlank { DEFAULT_HOME_URL } },
@@ -68,30 +70,29 @@ fun SessionRoute(
 
     SessionScreen(
         state = screenState,
-        actions = SessionScreenActions(
-            onHomeClick = onHomeClick,
-            onBackClick = webViewController::goBack,
-            onForwardClick = webViewController::goForward,
-            onRefreshClick = webViewController::reload,
-        ),
-        webContent = {
-            SessionWebView(
-                initialUrl = state.currentUrl,
-                controller = webViewController,
-                onPageStateChanged = { url, canGoBack, canGoForward ->
-                    viewModel.dispatch(
-                        SessionUiEvent.PageLoaded(
-                            url = url,
-                            canGoBack = canGoBack,
-                            canGoForward = canGoForward,
-                        ),
-                    )
-                },
-                modifier = Modifier.fillMaxSize(),
+        onHomeClick = onHomeClick,
+        onBottomSheetValueChange = { bottomSheetValue ->
+            viewModel.dispatch(
+                SessionUiEvent.BottomSheetValueChanged(bottomSheetValue),
             )
         },
         modifier = modifier,
-    )
+    ) {
+        SessionWebView(
+            initialUrl = screenState.currentUrl,
+            controller = webViewController,
+            onPageStateChanged = { url, canGoBack, canGoForward ->
+                viewModel.dispatch(
+                    SessionUiEvent.PageLoaded(
+                        url = url,
+                        canGoBack = canGoBack,
+                        canGoForward = canGoForward,
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }
 
 @Composable
@@ -109,30 +110,20 @@ private fun SessionBackHandler(
     }
 }
 
-private data class SessionScreenActions(
-    val onHomeClick: () -> Unit,
-    val onBackClick: () -> Unit,
-    val onForwardClick: () -> Unit,
-    val onRefreshClick: () -> Unit,
-)
-
 @Composable
 private fun SessionScreen(
     state: SessionUiState,
-    actions: SessionScreenActions,
-    webContent: @Composable () -> Unit,
+    onHomeClick: () -> Unit,
+    onBottomSheetValueChange: (ClipyBottomSheetValue) -> Unit,
     modifier: Modifier = Modifier,
+    webContent: @Composable () -> Unit,
 ) {
     // TODO: 디자인 시스템 적용
     Column(
         modifier = modifier.fillMaxSize(),
     ) {
         SessionHeader(
-            onHomeClick = actions.onHomeClick,
-        )
-        SessionBrowserToolbar(
-            state = state,
-            actions = actions,
+            onHomeClick = onHomeClick,
         )
         Box(
             modifier = Modifier
@@ -140,6 +131,23 @@ private fun SessionScreen(
                 .weight(1f),
         ) {
             webContent()
+            ClipyBottomSheetLayout(
+                value = state.bottomSheetState.toClipyBottomSheetValue(),
+                onValueChange = { bottomSheetValue ->
+                    onBottomSheetValueChange(bottomSheetValue)
+                },
+                modifier = Modifier,
+                headerContent = { contentValue ->
+                    SessionBottomSheetChrome(
+                        value = contentValue,
+                    )
+                },
+                sheetContent = { contentValue ->
+                    SessionBottomSheetContent(
+                        value = contentValue,
+                    )
+                },
+            )
         }
     }
 }
@@ -147,9 +155,10 @@ private fun SessionScreen(
 @Composable
 private fun SessionHeader(
     onHomeClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(50.dp)
             .background(MaterialTheme.colorScheme.background)
@@ -157,7 +166,7 @@ private fun SessionHeader(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BrowserToolbarTextButton(
+        SessionHeaderTextButton(
             text = "홈",
             onClick = onHomeClick,
         )
@@ -169,66 +178,148 @@ private fun SessionHeader(
 }
 
 @Composable
-private fun SessionBrowserToolbar(
-    state: SessionUiState,
-    actions: SessionScreenActions,
+private fun SessionBottomSheetChrome(
+    value: ClipyBottomSheetValue,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    when (value) {
+        ClipyBottomSheetValue.MINIMIZED,
+        ClipyBottomSheetValue.PEEK,
+        -> {
+            Box(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+            ) {
+                SessionBottomSheetUrlBar()
+            }
+        }
+
+        ClipyBottomSheetValue.HIDDEN,
+        ClipyBottomSheetValue.EXPANDED,
+        -> Unit
+    }
+}
+
+@Composable
+private fun SessionBottomSheetContent(
+    value: ClipyBottomSheetValue,
+    modifier: Modifier = Modifier,
+) {
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        BrowserToolbarTextButton(
-            text = "<",
-            enabled = state.canGoBack,
-            onClick = actions.onBackClick,
-        )
-        BrowserToolbarTextButton(
-            text = ">",
-            enabled = state.canGoForward,
-            onClick = actions.onForwardClick,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(32.dp)
-                .background(
-                    color = Color.LightGray,
-                    shape = RoundedCornerShape(14.dp),
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = state.currentUrl,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+        when (value) {
+            ClipyBottomSheetValue.HIDDEN -> Unit
+            ClipyBottomSheetValue.MINIMIZED -> Unit
+            ClipyBottomSheetValue.PEEK -> SessionPeekPlaceholder(
+                modifier = Modifier.padding(top = 16.dp),
             )
-            BrowserToolbarTextButton(
-                text = "↻",
-                onClick = actions.onRefreshClick,
-            )
-            Spacer(Modifier.width(12.dp))
+
+            ClipyBottomSheetValue.EXPANDED -> SessionExpandedPlaceholder()
         }
     }
 }
 
 @Composable
-private fun BrowserToolbarTextButton(
+private fun SessionBottomSheetUrlBar(
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(22.dp),
+            )
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = "Url Bar",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun SessionPeekPlaceholder(
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(128.dp)
+            .background(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = RoundedCornerShape(20.dp),
+            )
+            .padding(20.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = "Items",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+    }
+}
+
+@Composable
+private fun SessionExpandedPlaceholder(
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = "Session",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        repeat(3) { index ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = "Item ${index + 1}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionHeaderTextButton(
     text: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier
+        modifier = modifier
             .defaultMinSize(
                 minWidth = Dp.Hairline,
                 minHeight = Dp.Hairline,
@@ -263,22 +354,25 @@ private fun SessionScreenPreview() {
                 sessionId = "preview-session",
                 currentUrl = DEFAULT_HOME_URL,
             ),
-            actions = SessionScreenActions(
-                onHomeClick = { },
-                onBackClick = { },
-                onForwardClick = { },
-                onRefreshClick = { },
-            ),
-            webContent = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surface),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(text = "WebView")
-                }
-            },
-        )
+            onHomeClick = { },
+            onBottomSheetValueChange = { },
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(text = "WebView")
+            }
+        }
     }
 }
+
+private fun BottomSheetState.toClipyBottomSheetValue(): ClipyBottomSheetValue =
+    when (this) {
+        BottomSheetState.HIDDEN -> ClipyBottomSheetValue.HIDDEN
+        BottomSheetState.MINIMIZED -> ClipyBottomSheetValue.MINIMIZED
+        BottomSheetState.PEEK -> ClipyBottomSheetValue.PEEK
+        BottomSheetState.EXPANDED -> ClipyBottomSheetValue.EXPANDED
+    }
