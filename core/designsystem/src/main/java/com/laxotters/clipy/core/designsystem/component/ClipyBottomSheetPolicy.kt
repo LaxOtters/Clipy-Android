@@ -2,6 +2,7 @@ package com.laxotters.clipy.core.designsystem.component
 
 import kotlin.math.abs
 
+/** 상태별 sheet top anchor(offsetY)입니다. */
 internal data class ClipyBottomSheetAnchors(
     val expanded: Float,
     val peek: Float,
@@ -17,12 +18,14 @@ internal data class ClipyBottomSheetAnchors(
         }
 }
 
+/** drag 종료 후 target state를 판단할 때 사용하는 drag 결과입니다. */
 internal data class ClipyBottomSheetDragEnd(
     val translationY: Float,
     val velocityY: Float,
     val endOffsetY: Float,
 )
 
+/** headerContent와 sheetContent에 전달할 value 판단에 필요한 현재 sheet 정보입니다. */
 internal data class ClipyBottomSheetContentContext(
     val currentValue: ClipyBottomSheetValue,
     val offsetY: Float,
@@ -31,6 +34,13 @@ internal data class ClipyBottomSheetContentContext(
     val settlingTargetValue: ClipyBottomSheetValue?,
 )
 
+/**
+ * anchor와 drag 결과를 기준으로 target state를 결정합니다.
+ * 또한 headerContent와 sheetContent에 전달할 value를 결정합니다.
+ *
+ * anchor는 BottomSheet top의 offsetY입니다.
+ * offsetY가 작을수록 sheet는 위에 있고, 커질수록 아래로 내려갑니다.
+ */
 internal data class ClipyBottomSheetPolicy(
     val anchors: ClipyBottomSheetAnchors,
     val velocityThreshold: Float,

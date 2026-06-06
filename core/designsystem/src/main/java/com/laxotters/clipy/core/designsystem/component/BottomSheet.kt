@@ -42,6 +42,12 @@ import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 
+/**
+ * [value]를 기준으로 BottomSheet 위치와 content를 표시합니다.
+ *
+ * 사용자가 drag를 끝내면 다음 상태를 [onValueChange]로 전달합니다.
+ * 호출자는 전달받은 값을 다시 [value]에 반영해 상태를 확정합니다.
+ */
 @Composable
 fun ClipyBottomSheetLayout(
     value: ClipyBottomSheetValue,
@@ -51,6 +57,7 @@ fun ClipyBottomSheetLayout(
     sheetContent: @Composable ColumnScope.(ClipyBottomSheetValue) -> Unit,
 ) {
     val dragController = remember { ClipyBottomSheetDragController() }
+    // BottomSheet가 움직일 수 있는 부모 영역의 실제 px 높이입니다.
     var layoutHeightPx by remember { mutableFloatStateOf(0f) }
     val policy = rememberClipyBottomSheetPolicy(layoutHeightPx)
     val targetOffset = policy.offsetFor(value)
@@ -102,6 +109,11 @@ fun ClipyBottomSheetLayout(
     }
 }
 
+/**
+ * dp로 정의된 visible height를 px offset anchor로 변환합니다.
+ *
+ * 상태별 anchor offsetY는 availableHeight - visibleHeight입니다.
+ */
 @Composable
 private fun rememberClipyBottomSheetPolicy(
     availableHeight: Float,
@@ -222,6 +234,7 @@ private fun ClipyBottomSheetAnimatedContent(
     }
 }
 
+/** sheet가 아래로 내려간 만큼 부족해지는 Column 하단 높이를 채웁니다. */
 @Composable
 private fun ClipyBottomSheetBottomSpacer(
     hiddenOffset: Float,
@@ -239,6 +252,9 @@ private fun ClipyBottomSheetBottomSpacer(
     )
 }
 
+/**
+ * BottomSheet의 현재 offsetY와 target anchor 이동을 관리합니다.
+ */
 private class ClipyBottomSheetDragController {
     private var currentOffsetY by mutableFloatStateOf(0f)
     private val offsetYAnimatable = Animatable(0f)
@@ -247,15 +263,19 @@ private class ClipyBottomSheetDragController {
     var isDragging by mutableStateOf(false)
         private set
 
+    // drag 시작점부터 현재 지점까지 누적된 y축 이동량입니다.
+    // 음수는 위로 끄는 방향이고, 양수는 아래로 끄는 방향입니다.
     var dragTranslationY by mutableFloatStateOf(0f)
         private set
 
     var isSettling by mutableStateOf(false)
         private set
 
+    // settle 중에는 drag 종료 시점의 target content를 유지합니다.
     var settlingTargetValue by mutableStateOf<ClipyBottomSheetValue?>(null)
         private set
 
+    /** 현재 프레임에서 화면에 적용할 offsetY를 반환합니다. */
     fun displayedOffset(targetOffset: Float): Float = when {
         !isPositionInitialized -> targetOffset
         isSettling -> offsetYAnimatable.value
@@ -276,6 +296,7 @@ private class ClipyBottomSheetDragController {
         currentOffsetY = policy.clampOffsetY(currentOffsetY + delta)
     }
 
+    /** 외부에서 전달된 [targetOffset]으로 sheet 위치를 동기화합니다. */
     suspend fun syncTo(targetOffset: Float) {
         if (!isPositionInitialized) {
             offsetYAnimatable.snapTo(targetOffset)
@@ -295,6 +316,7 @@ private class ClipyBottomSheetDragController {
         }
     }
 
+    /** drag 종료 결과를 target state로 변환하고 target anchor까지 이동합니다. */
     suspend fun settle(
         currentValue: ClipyBottomSheetValue,
         velocity: Float,
