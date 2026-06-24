@@ -12,6 +12,7 @@ data class SessionViewState(
 
 enum class BottomSheetState {
     HIDDEN,
+    MINIMIZED,
     PEEK,
     EXPANDED,
 }
