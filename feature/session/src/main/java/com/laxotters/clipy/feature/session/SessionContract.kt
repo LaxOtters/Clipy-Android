@@ -6,12 +6,18 @@ import com.laxotters.clipy.core.ui.base.UiSideEffect
 import com.laxotters.clipy.core.ui.base.UiState
 import com.laxotters.clipy.domain.model.BottomSheetState
 
+enum class SessionTopBarState {
+    FOLDED,
+    UNFOLDED,
+}
+
 data class SessionUiState(
     val sessionId: String = "",
+    val bottomSheetState: BottomSheetState = BottomSheetState.PEEK,
+    val topBarState: SessionTopBarState = SessionTopBarState.UNFOLDED,
     val currentUrl: String = "",
     val canGoBack: Boolean = false,
     val canGoForward: Boolean = false,
-    val bottomSheetState: BottomSheetState = BottomSheetState.PEEK,
 ) : UiState {
     companion object {
         fun newSession(

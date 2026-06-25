@@ -7,14 +7,16 @@ import org.junit.Test
 
 class SessionViewModelTest {
     @Test
-    fun initialState_createViewModel_hasPeekBottomSheetState() {
+    fun initialState_createViewModel_hasInitialChromeState() {
         val viewModel = SessionViewModel()
+        val state = viewModel.state.value
 
-        assertEquals(BottomSheetState.PEEK, viewModel.state.value.bottomSheetState)
+        assertEquals(BottomSheetState.PEEK, state.bottomSheetState)
+        assertEquals(SessionTopBarState.UNFOLDED, state.topBarState)
     }
 
     @Test
-    fun changedBottomSheetState_newSessionEntered_resetsBottomSheetStateToPeek() {
+    fun changedState_newSessionEntered_resetsToInitialChromeState() {
         val viewModel = SessionViewModel()
 
         viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(ClipyBottomSheetValue.EXPANDED))
@@ -24,8 +26,10 @@ class SessionViewModelTest {
                 initialUrl = "https://example.com",
             ),
         )
+        val state = viewModel.state.value
 
-        assertEquals(BottomSheetState.PEEK, viewModel.state.value.bottomSheetState)
+        assertEquals(BottomSheetState.PEEK, state.bottomSheetState)
+        assertEquals(SessionTopBarState.UNFOLDED, state.topBarState)
     }
 
     @Test
@@ -40,8 +44,10 @@ class SessionViewModelTest {
 
         cases.forEach { (value, expectedState) ->
             viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(value))
+            val state = viewModel.state.value
 
-            assertEquals(expectedState, viewModel.state.value.bottomSheetState)
+            assertEquals(expectedState, state.bottomSheetState)
+            assertEquals(SessionTopBarState.UNFOLDED, state.topBarState)
         }
     }
 }
