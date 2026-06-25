@@ -15,12 +15,8 @@ class SessionViewModel @Inject constructor() :
                 if (sessionId == event.sessionId && currentUrl.isNotBlank()) {
                     this
                 } else {
-                    copy(
+                    SessionUiState.newSession(
                         sessionId = event.sessionId,
-                        currentUrl = event.initialUrl.ifBlank { DEFAULT_HOME_URL },
-                        canGoBack = false,
-                        canGoForward = false,
-                        bottomSheetState = BottomSheetState.PEEK,
                     )
                 }
             }

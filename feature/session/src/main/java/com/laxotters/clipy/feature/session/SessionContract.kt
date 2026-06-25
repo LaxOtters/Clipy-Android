@@ -12,7 +12,15 @@ data class SessionUiState(
     val canGoBack: Boolean = false,
     val canGoForward: Boolean = false,
     val bottomSheetState: BottomSheetState = BottomSheetState.PEEK,
-) : UiState
+) : UiState {
+    companion object {
+        fun newSession(
+            sessionId: String,
+        ) = SessionUiState(
+            sessionId = sessionId,
+        )
+    }
+}
 
 sealed interface SessionUiEvent : UiEvent {
     data class ScreenEntered(
