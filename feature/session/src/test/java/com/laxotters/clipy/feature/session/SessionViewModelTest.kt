@@ -23,7 +23,6 @@ class SessionViewModelTest {
         viewModel.dispatch(
             SessionUiEvent.ScreenEntered(
                 sessionId = "session-1",
-                initialUrl = "https://example.com",
             ),
         )
         val state = viewModel.state.value

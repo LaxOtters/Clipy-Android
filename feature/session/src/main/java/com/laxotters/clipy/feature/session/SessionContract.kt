@@ -31,7 +31,6 @@ data class SessionUiState(
 sealed interface SessionUiEvent : UiEvent {
     data class ScreenEntered(
         val sessionId: String,
-        val initialUrl: String,
     ) : SessionUiEvent
 
     data class PageLoaded(

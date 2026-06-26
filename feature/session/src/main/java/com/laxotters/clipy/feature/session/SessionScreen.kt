@@ -40,7 +40,6 @@ import com.laxotters.clipy.feature.session.webview.rememberSessionWebViewControl
 @Composable
 fun SessionRoute(
     sessionId: String,
-    initialUrl: String,
     onHomeClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SessionViewModel = hiltViewModel(),
@@ -50,14 +49,13 @@ fun SessionRoute(
 
     val screenState = state.copy(
         sessionId = state.sessionId.ifBlank { sessionId },
-        currentUrl = state.currentUrl.ifBlank { initialUrl.ifBlank { DEFAULT_HOME_URL } },
+        currentUrl = state.currentUrl.ifBlank { DEFAULT_HOME_URL },
     )
 
-    LaunchedEffect(sessionId, initialUrl) {
+    LaunchedEffect(sessionId) {
         viewModel.dispatch(
             SessionUiEvent.ScreenEntered(
                 sessionId = sessionId,
-                initialUrl = initialUrl,
             ),
         )
     }
@@ -79,7 +77,7 @@ fun SessionRoute(
         modifier = modifier,
     ) {
         SessionWebView(
-            initialUrl = screenState.currentUrl,
+            url = screenState.currentUrl,
             controller = webViewController,
             onPageStateChanged = { url, canGoBack, canGoForward ->
                 viewModel.dispatch(

@@ -11,12 +11,12 @@ import com.laxotters.clipy.feature.session.DEFAULT_HOME_URL
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun SessionWebView(
-    initialUrl: String?,
+    url: String?,
     controller: SessionWebViewController,
     onPageStateChanged: (url: String, canGoBack: Boolean, canGoForward: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val safeInitialUrl = initialUrl.takeUnless { it.isNullOrBlank() } ?: DEFAULT_HOME_URL
+    val safeUrl = url.takeUnless { it.isNullOrBlank() } ?: DEFAULT_HOME_URL
 
     AndroidView(
         modifier = modifier,
@@ -34,7 +34,7 @@ fun SessionWebView(
                     }
                 }
                 controller.attach(this)
-                loadUrl(safeInitialUrl)
+                loadUrl(safeUrl)
             }
         },
         update = { webView ->

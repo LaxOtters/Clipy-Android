@@ -18,7 +18,7 @@ import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 
 @Composable
 fun HomeRoute(
-    onSessionClick: (sessionId: String, initialUrl: String) -> Unit,
+    onSessionClick: (sessionId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -34,7 +34,7 @@ fun HomeRoute(
 @Composable
 private fun HomeScreen(
     state: HomeUiState,
-    onSessionClick: (sessionId: String, initialUrl: String) -> Unit,
+    onSessionClick: (sessionId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -47,7 +47,7 @@ private fun HomeScreen(
             Text(text = "Home")
             Button(
                 onClick = {
-                    onSessionClick(state.sessionId, state.sessionUrl)
+                    onSessionClick(state.sessionId)
                 },
                 modifier = Modifier.padding(top = 16.dp),
             ) {
@@ -63,7 +63,7 @@ private fun HomeScreenPreview() {
     ClipyTheme {
         HomeScreen(
             state = HomeUiState(),
-            onSessionClick = { _, _ -> },
+            onSessionClick = { },
         )
     }
 }

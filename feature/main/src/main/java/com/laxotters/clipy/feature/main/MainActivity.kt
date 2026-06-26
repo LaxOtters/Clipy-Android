@@ -33,26 +33,21 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun ClipyApp(modifier: Modifier = Modifier) {
     var sessionId by rememberSaveable { mutableStateOf<String?>(null) }
-    var initialUrl by rememberSaveable { mutableStateOf<String?>(null) }
 
     val selectedSessionId = sessionId
-    val selectedInitialUrl = initialUrl
 
-    if (selectedSessionId != null && selectedInitialUrl != null) {
+    if (selectedSessionId != null) {
         SessionRoute(
             sessionId = selectedSessionId,
-            initialUrl = selectedInitialUrl,
             onHomeClick = {
                 sessionId = null
-                initialUrl = null
             },
             modifier = modifier.fillMaxSize(),
         )
     } else {
         HomeRoute(
-            onSessionClick = { nextSessionId, nextInitialUrl ->
+            onSessionClick = { nextSessionId ->
                 sessionId = nextSessionId
-                initialUrl = nextInitialUrl
             },
             modifier = modifier.fillMaxSize(),
         )
