@@ -6,12 +6,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 object ClipyBottomSheetDefaults {
-    val HiddenHeight: Dp = 0.dp
-    val MinimizedHeight: Dp = 120.dp
-    val PeekHeight: Dp = 286.dp
-    val RetentionBand: Dp = 20.dp
-    val VelocityThreshold: Dp = 1_400.dp
     val HandleHeight: Dp = 32.dp
+    val HeaderHeight: Dp = 44.dp
+    val BottomPadding: Dp = 44.dp
+
+    val HiddenHeight: Dp = 0.dp
+    val MinimizedHeight: Dp = HandleHeight + HeaderHeight + BottomPadding
+    val PeekContentHeight: Dp = 166.dp
+    val PeekHeight: Dp = MinimizedHeight + PeekContentHeight
+
+    val RetentionBand: Dp = 30.dp
+    val VelocityThreshold: Dp = 1_400.dp
     val HandleWidth: Dp = 42.dp
     val HandleIndicatorHeight: Dp = 4.dp
     val SheetShape = RoundedCornerShape(
