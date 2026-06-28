@@ -17,7 +17,7 @@ import com.laxotters.clipy.domain.model.SessionStatus
 import java.time.Instant
 import java.util.UUID
 
-// Domain -> storage
+// Domain -> Storage
 internal fun Session.toEntity() = SessionEntity(
     id = id.toString(),
     name = name,
@@ -60,7 +60,7 @@ internal fun Decision.toEntity() = DecisionEntity(
     decidedAtMillis = decidedAt.toEpochMilli(),
 )
 
-// Storage -> domain
+// Storage -> Domain
 internal fun SessionWithItemsAndDecisions.toDomain() = Session(
     id = UUID.fromString(session.id),
     name = session.name,
@@ -102,7 +102,7 @@ private fun DecisionEntity.toDomain() = Decision(
     decidedAt = Instant.ofEpochMilli(decidedAtMillis),
 )
 
-// Value object mapping
+// Value object
 private fun ItemEntity.toMoneySnapshot(): MoneySnapshot? {
     val amount = priceAmount ?: return null
     val currency = priceCurrency ?: return null
@@ -132,7 +132,7 @@ private fun toImageRef(
     )
 }
 
-// 저장된 enum 문자열을 안전하게 복원하기 위한 대체 매핑
+// 저장된 값이 현재 enum에 없으면 기본 상태로 복원
 private fun String.toSessionStatus(): SessionStatus =
     runCatching { SessionStatus.valueOf(this) }
         .getOrDefault(SessionStatus.DRAFT)

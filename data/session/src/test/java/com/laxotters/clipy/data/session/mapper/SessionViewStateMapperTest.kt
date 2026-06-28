@@ -71,7 +71,7 @@ class SessionViewStateMapperTest {
     }
 
     @Test
-    fun unknownBottomSheetState_toDomain_fallsBackToHidden() {
+    fun unknownBottomSheetState_toDomain_fallsBackToPeek() {
         val entity = SessionViewStateEntity(
             sessionId = "00000000-0000-0000-0000-000000000001",
             lastWebUrl = null,
@@ -81,7 +81,7 @@ class SessionViewStateMapperTest {
 
         val sessionViewState = entity.toDomain()
 
-        assertEquals(BottomSheetState.HIDDEN, sessionViewState.bottomSheetState)
+        assertEquals(BottomSheetState.PEEK, sessionViewState.bottomSheetState)
     }
 
     @Test(expected = IllegalArgumentException::class)
