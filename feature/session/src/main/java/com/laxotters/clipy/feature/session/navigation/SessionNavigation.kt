@@ -9,7 +9,6 @@ fun EntryProviderScope<NavKey>.sessionScreen() {
     entry<Route.Session> { route ->
         SessionRoute(
             sessionId = route.sessionId,
-            initialUrl = route.initialUrl,
         )
     }
 }

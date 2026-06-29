@@ -1,3 +1,6 @@
+// TODO: design system 컴포넌트로 분리 후 suppress 제거
+@file:Suppress("TooManyFunctions")
+
 package com.laxotters.clipy.feature.session
 
 import androidx.activity.compose.BackHandler
@@ -11,8 +14,9 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -21,8 +25,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -30,17 +36,18 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetDefaults.HeaderHeight
 import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetLayout
 import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetValue
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.webview.SessionWebView
+import com.laxotters.clipy.feature.session.webview.SessionWebViewController
 import com.laxotters.clipy.feature.session.webview.rememberSessionWebViewController
 
 @Composable
 fun SessionRoute(
     sessionId: String,
-    initialUrl: String,
     onHomeClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SessionViewModel = hiltViewModel(),
@@ -48,16 +55,17 @@ fun SessionRoute(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val webViewController = rememberSessionWebViewController()
 
-    val screenState = state.copy(
-        sessionId = state.sessionId.ifBlank { sessionId },
-        currentUrl = state.currentUrl.ifBlank { initialUrl.ifBlank { DEFAULT_HOME_URL } },
-    )
+    val routeInitialUrl = if (state.sessionId == sessionId) state.initialUrl else null
+    val screenState = if (routeInitialUrl != null) {
+        state
+    } else {
+        SessionUiState(sessionId = sessionId)
+    }
 
-    LaunchedEffect(sessionId, initialUrl) {
+    LaunchedEffect(sessionId) {
         viewModel.dispatch(
             SessionUiEvent.ScreenEntered(
                 sessionId = sessionId,
-                initialUrl = initialUrl,
             ),
         )
     }
@@ -70,27 +78,61 @@ fun SessionRoute(
 
     SessionScreen(
         state = screenState,
-        onHomeClick = onHomeClick,
-        onBottomSheetValueChange = { bottomSheetValue ->
-            viewModel.dispatch(
-                SessionUiEvent.BottomSheetValueChanged(bottomSheetValue),
-            )
-        },
+        actions = ScreenActions(
+            topBarActions = TopBarActions(
+                onHomeClick = onHomeClick,
+                onAddItemClick = { },
+                onTopBarFoldClick = { },
+            ),
+            browserBarActions = BrowserBarActions(
+                onBackClick = webViewController::goBack,
+                onForwardClick = webViewController::goForward,
+                onRefreshClick = webViewController::reload,
+            ),
+            onBottomSheetValueChange = { bottomSheetValue ->
+                viewModel.dispatch(
+                    SessionUiEvent.BottomSheetValueChanged(bottomSheetValue),
+                )
+            },
+        ),
         modifier = modifier,
     ) {
-        SessionWebView(
-            initialUrl = screenState.currentUrl,
+        SessionWebViewHost(
+            sessionId = sessionId,
+            initialUrl = routeInitialUrl,
             controller = webViewController,
-            onPageStateChanged = { url, canGoBack, canGoForward ->
-                viewModel.dispatch(
+            onPageLoaded = { pageLoaded ->
+                viewModel.dispatch(pageLoaded)
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+private fun SessionWebViewHost(
+    sessionId: String,
+    initialUrl: String?,
+    controller: SessionWebViewController,
+    onPageLoaded: (SessionUiEvent.PageLoaded) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // sessionId가 바뀌면 WebView 참조와 초기 URL 로딩 상태를 새로 잡습니다.
+    key(sessionId) {
+        SessionWebView(
+            url = initialUrl,
+            controller = controller,
+            onPageStateChanged = { pageUrl, canGoBack, canGoForward ->
+                onPageLoaded(
                     SessionUiEvent.PageLoaded(
-                        url = url,
+                        sessionId = sessionId,
+                        url = pageUrl,
                         canGoBack = canGoBack,
                         canGoForward = canGoForward,
                     ),
                 )
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier,
         )
     }
 }
@@ -110,90 +152,161 @@ private fun SessionBackHandler(
     }
 }
 
+private data class ScreenActions(
+    val topBarActions: TopBarActions,
+    val browserBarActions: BrowserBarActions,
+    val onBottomSheetValueChange: (ClipyBottomSheetValue) -> Unit,
+)
+
+private data class TopBarActions(
+    val onHomeClick: () -> Unit,
+    val onAddItemClick: () -> Unit,
+    val onTopBarFoldClick: () -> Unit,
+)
+
+private data class BrowserBarState(
+    val currentUrl: String,
+    val canGoBack: Boolean,
+    val canGoForward: Boolean,
+    val canRefresh: Boolean,
+)
+
+private data class BrowserBarActions(
+    val onBackClick: () -> Unit,
+    val onForwardClick: () -> Unit,
+    val onRefreshClick: () -> Unit,
+)
+
 @Composable
 private fun SessionScreen(
     state: SessionUiState,
-    onHomeClick: () -> Unit,
-    onBottomSheetValueChange: (ClipyBottomSheetValue) -> Unit,
+    actions: ScreenActions,
     modifier: Modifier = Modifier,
     webContent: @Composable () -> Unit,
 ) {
-    // TODO: 디자인 시스템 적용
-    Column(
+    Box(
         modifier = modifier.fillMaxSize(),
     ) {
-        SessionHeader(
-            onHomeClick = onHomeClick,
-        )
-        Box(
+        webContent()
+        SessionTopBar(
+            topBarState = state.topBarState,
+            sessionName = "Untitled",
+            actions = actions.topBarActions,
             modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .fillMaxWidth()
-                .weight(1f),
-        ) {
-            webContent()
-            ClipyBottomSheetLayout(
-                value = state.bottomSheetState.toClipyBottomSheetValue(),
-                onValueChange = { bottomSheetValue ->
-                    onBottomSheetValueChange(bottomSheetValue)
-                },
-                modifier = Modifier,
-                headerContent = { contentValue ->
-                    SessionBottomSheetChrome(
-                        value = contentValue,
-                    )
-                },
-                sheetContent = { contentValue ->
-                    SessionBottomSheetContent(
-                        value = contentValue,
-                    )
-                },
-            )
-        }
+                .height(70.dp),
+        )
+        ClipyBottomSheetLayout(
+            value = state.bottomSheetState.toClipyBottomSheetValue(),
+            onValueChange = { bottomSheetValue ->
+                actions.onBottomSheetValueChange(bottomSheetValue)
+            },
+            modifier = Modifier.fillMaxSize(),
+            headerContent = { renderedValue ->
+                SheetHeader(
+                    value = renderedValue,
+                    browserBarState = BrowserBarState(
+                        currentUrl = state.currentUrl.ifBlank { state.initialUrl.orEmpty() },
+                        canGoBack = state.canGoBack,
+                        canGoForward = state.canGoForward,
+                        canRefresh = state.initialUrl != null,
+                    ),
+                    browserBarActions = actions.browserBarActions,
+                )
+            },
+            sheetContent = { renderedValue ->
+                SheetContent(
+                    value = renderedValue,
+                )
+            },
+        )
     }
 }
 
 @Composable
-private fun SessionHeader(
-    onHomeClick: () -> Unit,
+private fun SessionTopBar(
+    topBarState: SessionTopBarState,
+    sessionName: String,
+    actions: TopBarActions,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(50.dp)
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val foldControlText = when (topBarState) {
+        SessionTopBarState.FOLDED -> "펼치기"
+        SessionTopBarState.UNFOLDED -> "접기"
+    }
+
+    Box(
+        modifier = modifier,
     ) {
-        SessionHeaderTextButton(
-            text = "홈",
-            onClick = onHomeClick,
-        )
-        Text(
-            text = "Clipy",
-            style = MaterialTheme.typography.headlineSmall,
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(56.dp)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(28.dp),
+                    clip = false,
+                )
+                .background(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(28.dp),
+                )
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ControlButton(
+                text = "홈",
+                onClick = actions.onHomeClick,
+                minWidth = 44.dp,
+            )
+            Text(
+                text = sessionName,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            ControlButton(
+                text = "추가",
+                onClick = actions.onAddItemClick,
+                minWidth = 44.dp,
+            )
+        }
+        ControlButton(
+            text = foldControlText,
+            onClick = actions.onTopBarFoldClick,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = (-2).dp),
+            minWidth = 52.dp,
+            height = 28.dp,
         )
     }
 }
 
 @Composable
-private fun SessionBottomSheetChrome(
+private fun SheetHeader(
     value: ClipyBottomSheetValue,
+    browserBarState: BrowserBarState,
+    browserBarActions: BrowserBarActions,
     modifier: Modifier = Modifier,
 ) {
     when (value) {
         ClipyBottomSheetValue.MINIMIZED,
         ClipyBottomSheetValue.PEEK,
-        -> {
-            Box(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-            ) {
-                SessionBottomSheetUrlBar()
-            }
-        }
+        -> BrowserBar(
+            state = browserBarState,
+            actions = browserBarActions,
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        )
 
         ClipyBottomSheetValue.HIDDEN,
         ClipyBottomSheetValue.EXPANDED,
@@ -202,7 +315,7 @@ private fun SessionBottomSheetChrome(
 }
 
 @Composable
-private fun SessionBottomSheetContent(
+private fun SheetContent(
     value: ClipyBottomSheetValue,
     modifier: Modifier = Modifier,
 ) {
@@ -215,23 +328,59 @@ private fun SessionBottomSheetContent(
         when (value) {
             ClipyBottomSheetValue.HIDDEN -> Unit
             ClipyBottomSheetValue.MINIMIZED -> Unit
-            ClipyBottomSheetValue.PEEK -> SessionPeekPlaceholder(
-                modifier = Modifier.padding(top = 16.dp),
-            )
-
-            ClipyBottomSheetValue.EXPANDED -> SessionExpandedPlaceholder()
+            ClipyBottomSheetValue.PEEK -> PeekPlaceholder()
+            ClipyBottomSheetValue.EXPANDED -> ExpandedPlaceholder()
         }
     }
 }
 
 @Composable
-private fun SessionBottomSheetUrlBar(
+private fun BrowserBar(
+    state: BrowserBarState,
+    actions: BrowserBarActions,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.height(44.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ControlButton(
+            text = "<",
+            onClick = actions.onBackClick,
+            enabled = state.canGoBack,
+            minWidth = 20.dp,
+            height = 20.dp,
+        )
+        ControlButton(
+            text = ">",
+            onClick = actions.onForwardClick,
+            enabled = state.canGoForward,
+            minWidth = 20.dp,
+            height = 20.dp,
+        )
+        UrlDisplay(
+            url = state.currentUrl,
+            modifier = Modifier.weight(1f),
+        )
+        ControlButton(
+            text = "새로고침",
+            onClick = actions.onRefreshClick,
+            enabled = state.canRefresh,
+            minWidth = 64.dp,
+            height = 32.dp,
+        )
+    }
+}
+
+@Composable
+private fun UrlDisplay(
+    url: String,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .height(44.dp)
+            .height(HeaderHeight)
             .background(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(22.dp),
@@ -240,7 +389,7 @@ private fun SessionBottomSheetUrlBar(
         contentAlignment = Alignment.CenterStart,
     ) {
         Text(
-            text = "Url Bar",
+            text = url,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -250,12 +399,11 @@ private fun SessionBottomSheetUrlBar(
 }
 
 @Composable
-private fun SessionPeekPlaceholder(
-    modifier: Modifier = Modifier,
-) {
+private fun PeekPlaceholder() {
     Box(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
+            .padding(top = 16.dp)
             .height(128.dp)
             .background(
                 color = MaterialTheme.colorScheme.secondaryContainer,
@@ -265,7 +413,7 @@ private fun SessionPeekPlaceholder(
         contentAlignment = Alignment.CenterStart,
     ) {
         Text(
-            text = "Items",
+            text = "비교할 아이템 없음",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
         )
@@ -273,7 +421,7 @@ private fun SessionPeekPlaceholder(
 }
 
 @Composable
-private fun SessionExpandedPlaceholder(
+private fun ExpandedPlaceholder(
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -310,23 +458,25 @@ private fun SessionExpandedPlaceholder(
 }
 
 @Composable
-private fun SessionHeaderTextButton(
+private fun ControlButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    minWidth: Dp = 44.dp,
+    height: Dp = 36.dp,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier
             .defaultMinSize(
-                minWidth = Dp.Hairline,
-                minHeight = Dp.Hairline,
+                minWidth = minWidth,
+                minHeight = height,
             )
-            .size(width = 20.dp, height = 32.dp),
-        colors = transparentButtonColors(),
-        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+            .height(height),
+        colors = controlButtonColors(),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
     ) {
         Text(
             text = text,
@@ -338,7 +488,7 @@ private fun SessionHeaderTextButton(
 }
 
 @Composable
-private fun transparentButtonColors() = ButtonDefaults.buttonColors(
+private fun controlButtonColors() = ButtonDefaults.buttonColors(
     containerColor = Color.Transparent,
     contentColor = MaterialTheme.colorScheme.onSurface,
     disabledContainerColor = Color.Transparent,
@@ -354,8 +504,19 @@ private fun SessionScreenPreview() {
                 sessionId = "preview-session",
                 currentUrl = DEFAULT_HOME_URL,
             ),
-            onHomeClick = { },
-            onBottomSheetValueChange = { },
+            actions = ScreenActions(
+                topBarActions = TopBarActions(
+                    onHomeClick = { },
+                    onAddItemClick = { },
+                    onTopBarFoldClick = { },
+                ),
+                browserBarActions = BrowserBarActions(
+                    onBackClick = { },
+                    onForwardClick = { },
+                    onRefreshClick = { },
+                ),
+                onBottomSheetValueChange = { },
+            ),
         ) {
             Box(
                 modifier = Modifier

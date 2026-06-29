@@ -6,7 +6,6 @@ import com.laxotters.clipy.core.ui.base.UiState
 
 data class HomeUiState(
     val sessionId: String = "00000000-0000-0000-0000-000000000001",
-    val sessionUrl: String = "https://google.com",
 ) : UiState
 
 sealed interface HomeUiEvent : UiEvent

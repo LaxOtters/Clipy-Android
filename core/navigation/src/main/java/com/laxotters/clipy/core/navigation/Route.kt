@@ -11,6 +11,5 @@ sealed interface Route : NavKey {
     @Serializable
     data class Session(
         val sessionId: String,
-        val initialUrl: String,
     ) : Route
 }
