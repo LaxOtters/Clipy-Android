@@ -15,6 +15,7 @@ data class SessionUiState(
     val sessionId: String = "",
     val bottomSheetState: BottomSheetState = BottomSheetState.PEEK,
     val topBarState: SessionTopBarState = SessionTopBarState.UNFOLDED,
+    val initialUrl: String? = null,
     val currentUrl: String = "",
     val canGoBack: Boolean = false,
     val canGoForward: Boolean = false,
@@ -22,8 +23,10 @@ data class SessionUiState(
     companion object {
         fun newSession(
             sessionId: String,
+            initialUrl: String,
         ) = SessionUiState(
             sessionId = sessionId,
+            initialUrl = initialUrl,
         )
     }
 }
@@ -34,6 +37,7 @@ sealed interface SessionUiEvent : UiEvent {
     ) : SessionUiEvent
 
     data class PageLoaded(
+        val sessionId: String,
         val url: String,
         val canGoBack: Boolean,
         val canGoForward: Boolean,

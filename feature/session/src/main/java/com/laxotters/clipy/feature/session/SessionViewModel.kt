@@ -12,21 +12,28 @@ class SessionViewModel @Inject constructor() :
     override fun handleEvent(event: SessionUiEvent) {
         when (event) {
             is SessionUiEvent.ScreenEntered -> updateState {
-                if (sessionId == event.sessionId && currentUrl.isNotBlank()) {
+                if (sessionId == event.sessionId && initialUrl != null) {
                     this
                 } else {
+                    // TODO: 저장된 세션 lastWebUrl 조회로 DEFAULT_HOME_URL 대체
                     SessionUiState.newSession(
                         sessionId = event.sessionId,
+                        initialUrl = DEFAULT_HOME_URL,
                     )
                 }
             }
 
             is SessionUiEvent.PageLoaded -> updateState {
-                copy(
-                    currentUrl = event.url,
-                    canGoBack = event.canGoBack,
-                    canGoForward = event.canGoForward,
-                )
+                // 이전 세션 WebView의 지연 콜백이면 현재 세션 상태를 덮지 않습니다.
+                if (event.sessionId != sessionId) {
+                    this
+                } else {
+                    copy(
+                        currentUrl = event.url,
+                        canGoBack = event.canGoBack,
+                        canGoForward = event.canGoForward,
+                    )
+                }
             }
 
             is SessionUiEvent.BottomSheetValueChanged -> updateState {

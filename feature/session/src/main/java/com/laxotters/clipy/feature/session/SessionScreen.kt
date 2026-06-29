@@ -1,3 +1,6 @@
+// TODO: design system 컴포넌트로 분리 후 suppress 제거
+@file:Suppress("TooManyFunctions")
+
 package com.laxotters.clipy.feature.session
 
 import androidx.activity.compose.BackHandler
@@ -22,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -38,6 +42,7 @@ import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetValue
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.webview.SessionWebView
+import com.laxotters.clipy.feature.session.webview.SessionWebViewController
 import com.laxotters.clipy.feature.session.webview.rememberSessionWebViewController
 
 @Composable
@@ -50,10 +55,12 @@ fun SessionRoute(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val webViewController = rememberSessionWebViewController()
 
-    val screenState = state.copy(
-        sessionId = state.sessionId.ifBlank { sessionId },
-        currentUrl = state.currentUrl.ifBlank { DEFAULT_HOME_URL },
-    )
+    val routeInitialUrl = if (state.sessionId == sessionId) state.initialUrl else null
+    val screenState = if (routeInitialUrl != null) {
+        state
+    } else {
+        SessionUiState(sessionId = sessionId)
+    }
 
     LaunchedEffect(sessionId) {
         viewModel.dispatch(
@@ -90,19 +97,42 @@ fun SessionRoute(
         ),
         modifier = modifier,
     ) {
-        SessionWebView(
-            url = screenState.currentUrl,
+        SessionWebViewHost(
+            sessionId = sessionId,
+            initialUrl = routeInitialUrl,
             controller = webViewController,
-            onPageStateChanged = { url, canGoBack, canGoForward ->
-                viewModel.dispatch(
+            onPageLoaded = { pageLoaded ->
+                viewModel.dispatch(pageLoaded)
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+private fun SessionWebViewHost(
+    sessionId: String,
+    initialUrl: String?,
+    controller: SessionWebViewController,
+    onPageLoaded: (SessionUiEvent.PageLoaded) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // sessionId가 바뀌면 WebView 참조와 초기 URL 로딩 상태를 새로 잡습니다.
+    key(sessionId) {
+        SessionWebView(
+            url = initialUrl,
+            controller = controller,
+            onPageStateChanged = { pageUrl, canGoBack, canGoForward ->
+                onPageLoaded(
                     SessionUiEvent.PageLoaded(
-                        url = url,
+                        sessionId = sessionId,
+                        url = pageUrl,
                         canGoBack = canGoBack,
                         canGoForward = canGoForward,
                     ),
                 )
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier,
         )
     }
 }
@@ -138,6 +168,7 @@ private data class BrowserBarState(
     val currentUrl: String,
     val canGoBack: Boolean,
     val canGoForward: Boolean,
+    val canRefresh: Boolean,
 )
 
 private data class BrowserBarActions(
@@ -178,9 +209,10 @@ private fun SessionScreen(
                 SheetHeader(
                     value = renderedValue,
                     browserBarState = BrowserBarState(
-                        currentUrl = state.currentUrl,
+                        currentUrl = state.currentUrl.ifBlank { state.initialUrl.orEmpty() },
                         canGoBack = state.canGoBack,
                         canGoForward = state.canGoForward,
+                        canRefresh = state.initialUrl != null,
                     ),
                     browserBarActions = actions.browserBarActions,
                 )
@@ -334,6 +366,7 @@ private fun BrowserBar(
         ControlButton(
             text = "새로고침",
             onClick = actions.onRefreshClick,
+            enabled = state.canRefresh,
             minWidth = 64.dp,
             height = 32.dp,
         )
