@@ -24,6 +24,12 @@ class SessionWebViewController internal constructor() {
     internal fun attach(webView: WebView) {
         this.webView = webView
     }
+
+    internal fun detach(webView: WebView) {
+        if (this.webView === webView) {
+            this.webView = null
+        }
+    }
 }
 
 @Composable
