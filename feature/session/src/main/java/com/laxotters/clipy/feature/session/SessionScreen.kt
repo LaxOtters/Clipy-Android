@@ -49,7 +49,6 @@ import com.laxotters.clipy.feature.session.webview.rememberSessionWebViewControl
 fun SessionRoute(
     sessionId: String,
     onHomeClick: () -> Unit = {},
-    modifier: Modifier = Modifier,
     viewModel: SessionViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -95,7 +94,6 @@ fun SessionRoute(
                 )
             },
         ),
-        modifier = modifier,
     ) {
         SessionWebViewHost(
             sessionId = sessionId,

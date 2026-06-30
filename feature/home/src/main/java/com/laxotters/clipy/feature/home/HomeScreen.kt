@@ -19,7 +19,6 @@ import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 @Composable
 fun HomeRoute(
     onSessionClick: (sessionId: String) -> Unit,
-    modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -27,7 +26,6 @@ fun HomeRoute(
     HomeScreen(
         state = state,
         onSessionClick = onSessionClick,
-        modifier = modifier,
     )
 }
 
