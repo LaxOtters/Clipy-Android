@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.dp
 object ClipyBottomSheetDefaults {
     val HandleHeight: Dp = 32.dp
     val HeaderHeight: Dp = 44.dp
-    val BottomPadding: Dp = 44.dp
+    val BottomPadding: Dp = 32.dp
 
     val HiddenHeight: Dp = 0.dp
     val MinimizedHeight: Dp = HandleHeight + HeaderHeight + BottomPadding
