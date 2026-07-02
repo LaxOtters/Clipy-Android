@@ -3,6 +3,7 @@ package com.laxotters.clipy.feature.session
 import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetValue
 import com.laxotters.clipy.core.ui.base.BaseViewModel
 import com.laxotters.clipy.domain.model.BottomSheetState
+import com.laxotters.clipy.feature.session.util.formatUrlLabel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
@@ -30,6 +31,7 @@ class SessionViewModel @Inject constructor() :
                 } else {
                     copy(
                         currentUrl = event.url,
+                        currentUrlLabel = formatUrlLabel(event.url),
                         canGoBack = event.canGoBack,
                         canGoForward = event.canGoForward,
                     )

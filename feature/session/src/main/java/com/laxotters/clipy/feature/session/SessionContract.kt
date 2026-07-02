@@ -5,6 +5,7 @@ import com.laxotters.clipy.core.ui.base.UiEvent
 import com.laxotters.clipy.core.ui.base.UiSideEffect
 import com.laxotters.clipy.core.ui.base.UiState
 import com.laxotters.clipy.domain.model.BottomSheetState
+import com.laxotters.clipy.feature.session.util.formatUrlLabel
 
 enum class SessionTopBarState {
     FOLDED,
@@ -17,6 +18,8 @@ data class SessionUiState(
     val topBarState: SessionTopBarState = SessionTopBarState.UNFOLDED,
     val initialUrl: String? = null,
     val currentUrl: String = "",
+    // 화면에 표시할 URL source가 바뀌면 함께 갱신해야 합니다.
+    val currentUrlLabel: String = "",
     val canGoBack: Boolean = false,
     val canGoForward: Boolean = false,
 ) : UiState {
@@ -27,6 +30,7 @@ data class SessionUiState(
         ) = SessionUiState(
             sessionId = sessionId,
             initialUrl = initialUrl,
+            currentUrlLabel = formatUrlLabel(initialUrl),
         )
     }
 }

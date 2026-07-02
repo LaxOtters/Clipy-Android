@@ -164,7 +164,7 @@ private data class TopBarActions(
 )
 
 private data class BrowserBarState(
-    val currentUrl: String,
+    val urlLabel: String,
     val canGoBack: Boolean,
     val canGoForward: Boolean,
     val canRefresh: Boolean,
@@ -210,7 +210,7 @@ private fun SessionScreen(
                 SheetHeader(
                     value = renderedValue,
                     browserBarState = BrowserBarState(
-                        currentUrl = state.currentUrl.ifBlank { state.initialUrl.orEmpty() },
+                        urlLabel = state.currentUrlLabel,
                         canGoBack = state.canGoBack,
                         canGoForward = state.canGoForward,
                         canRefresh = state.initialUrl != null,
@@ -361,7 +361,7 @@ private fun BrowserBar(
             height = 20.dp,
         )
         UrlDisplay(
-            url = state.currentUrl,
+            url = state.urlLabel,
             modifier = Modifier.weight(1f),
         )
         ControlButton(
@@ -504,6 +504,7 @@ private fun SessionScreenPreview() {
             state = SessionUiState(
                 sessionId = "preview-session",
                 currentUrl = DEFAULT_HOME_URL,
+                currentUrlLabel = "google.com",
             ),
             actions = ScreenActions(
                 topBarActions = TopBarActions(
