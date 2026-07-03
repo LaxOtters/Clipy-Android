@@ -3,6 +3,7 @@ package com.laxotters.clipy.feature.home
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -19,7 +20,6 @@ import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 @Composable
 fun HomeRoute(
     onSessionClick: (sessionId: String) -> Unit,
-    modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -27,7 +27,6 @@ fun HomeRoute(
     HomeScreen(
         state = state,
         onSessionClick = onSessionClick,
-        modifier = modifier,
     )
 }
 
@@ -38,7 +37,9 @@ private fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .navigationBarsPadding(),
         contentAlignment = Alignment.Center,
     ) {
         Column(

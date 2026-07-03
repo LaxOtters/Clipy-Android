@@ -11,4 +11,5 @@ dependencies {
     implementation(libs.androidx.navigation3.runtime)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
