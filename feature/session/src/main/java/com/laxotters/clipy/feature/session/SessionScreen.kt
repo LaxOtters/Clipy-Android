@@ -62,13 +62,7 @@ fun SessionRoute(
         SessionUiState(sessionId = sessionId)
     }
 
-    LaunchedEffect(sessionId) {
-        viewModel.dispatch(
-            SessionUiEvent.ScreenEntered(
-                sessionId = sessionId,
-            ),
-        )
-    }
+    LaunchedEffect(sessionId) { viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = sessionId)) }
 
     SessionBackHandler(
         canGoBack = screenState.canGoBack,
@@ -82,7 +76,7 @@ fun SessionRoute(
             topBarActions = TopBarActions(
                 onHomeClick = onHomeClick,
                 onAddItemClick = { },
-                onTopBarFoldClick = { },
+                onTopBarFoldClick = { viewModel.dispatch(SessionUiEvent.TopBarFoldClicked) },
             ),
             browserBarActions = BrowserBarActions(
                 onBackClick = webViewController::goBack,
@@ -100,8 +94,16 @@ fun SessionRoute(
             sessionId = sessionId,
             initialUrl = routeInitialUrl,
             controller = webViewController,
-            onPageLoaded = { pageLoaded ->
-                viewModel.dispatch(pageLoaded)
+            onPageLoaded = viewModel::dispatch,
+            onRootScrolled = { deltaY, scrollableDistance, viewportHeight, touchSlopPx ->
+                viewModel.dispatch(
+                    SessionUiEvent.WebViewRootScrolled(
+                        deltaY = deltaY,
+                        scrollableDistance = scrollableDistance,
+                        viewportHeight = viewportHeight,
+                        touchSlopPx = touchSlopPx,
+                    ),
+                )
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -114,6 +116,7 @@ private fun SessionWebViewHost(
     initialUrl: String?,
     controller: SessionWebViewController,
     onPageLoaded: (SessionUiEvent.PageLoaded) -> Unit,
+    onRootScrolled: (deltaY: Int, scrollableDistance: Int, viewportHeight: Int, touchSlopPx: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // sessionId가 바뀌면 WebView 참조와 초기 URL 로딩 상태를 새로 잡습니다.
@@ -131,6 +134,7 @@ private fun SessionWebViewHost(
                     ),
                 )
             },
+            onRootScrolled = onRootScrolled,
             modifier = modifier,
         )
     }
@@ -192,6 +196,7 @@ private fun SessionScreen(
         SessionTopBar(
             topBarState = state.topBarState,
             sessionName = "Untitled",
+            isFoldEnabled = !state.isWebViewRootScrolling,
             actions = actions.topBarActions,
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -231,6 +236,7 @@ private fun SessionScreen(
 private fun SessionTopBar(
     topBarState: SessionTopBarState,
     sessionName: String,
+    isFoldEnabled: Boolean,
     actions: TopBarActions,
     modifier: Modifier = Modifier,
 ) {
@@ -242,46 +248,49 @@ private fun SessionTopBar(
     Box(
         modifier = modifier,
     ) {
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(56.dp)
-                .shadow(
-                    elevation = 8.dp,
-                    shape = RoundedCornerShape(28.dp),
-                    clip = false,
+        if (topBarState == SessionTopBarState.UNFOLDED) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(28.dp),
+                        clip = false,
+                    )
+                    .background(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(28.dp),
+                    )
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ControlButton(
+                    text = "홈",
+                    onClick = actions.onHomeClick,
+                    minWidth = 44.dp,
                 )
-                .background(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(28.dp),
+                Text(
+                    text = sessionName,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ControlButton(
-                text = "홈",
-                onClick = actions.onHomeClick,
-                minWidth = 44.dp,
-            )
-            Text(
-                text = sessionName,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            ControlButton(
-                text = "추가",
-                onClick = actions.onAddItemClick,
-                minWidth = 44.dp,
-            )
+                ControlButton(
+                    text = "추가",
+                    onClick = actions.onAddItemClick,
+                    minWidth = 44.dp,
+                )
+            }
         }
         ControlButton(
             text = foldControlText,
             onClick = actions.onTopBarFoldClick,
+            enabled = isFoldEnabled,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset(y = (-2).dp),

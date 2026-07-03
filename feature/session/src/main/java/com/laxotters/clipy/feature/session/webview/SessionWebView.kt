@@ -2,6 +2,7 @@ package com.laxotters.clipy.feature.session.webview
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.view.ViewConfiguration
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -17,9 +18,11 @@ fun SessionWebView(
     url: String?,
     controller: SessionWebViewController,
     onPageStateChanged: (url: String, canGoBack: Boolean, canGoForward: Boolean) -> Unit,
+    onRootScrolled: (deltaY: Int, scrollableDistance: Int, viewportHeight: Int, touchSlopPx: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val currentOnPageStateChanged by rememberUpdatedState(onPageStateChanged)
+    val currentOnRootScrolled by rememberUpdatedState(onRootScrolled)
     val loadState = remember { SessionWebViewLoadState() }
 
     AndroidView(
@@ -31,6 +34,9 @@ fun SessionWebView(
                         currentOnPageStateChanged(pageUrl, canGoBack, canGoForward)
                     },
                 )
+                webView.onRootScrolled = { deltaY, scrollableDistance, viewportHeight, touchSlopPx ->
+                    currentOnRootScrolled(deltaY, scrollableDistance, viewportHeight, touchSlopPx)
+                }
             }
         },
         update = { container ->
@@ -44,6 +50,7 @@ fun SessionWebView(
         },
         onRelease = { container ->
             controller.detach(container.webView)
+            container.webView.onRootScrolled = null
             container.removeAllViews()
             container.webView.destroy()
         },
@@ -72,7 +79,7 @@ private fun WebView.configureSessionWebView(
 }
 
 private class SessionWebViewContainer(context: Context) : FrameLayout(context) {
-    val webView: WebView = WebView(context)
+    val webView: RootScrollWebView = RootScrollWebView(context)
 
     init {
         addView(
@@ -82,5 +89,39 @@ private class SessionWebViewContainer(context: Context) : FrameLayout(context) {
                 LayoutParams.MATCH_PARENT,
             ),
         )
+    }
+}
+
+private typealias RootScrollCallback = (
+    deltaY: Int,
+    scrollableDistance: Int,
+    viewportHeight: Int,
+    touchSlopPx: Int,
+) -> Unit
+
+private class RootScrollWebView(context: Context) : WebView(context) {
+    var onRootScrolled: RootScrollCallback? = null
+    private val touchSlopPx = ViewConfiguration.get(context).scaledTouchSlop
+
+    override fun onScrollChanged(
+        left: Int,
+        top: Int,
+        oldLeft: Int,
+        oldTop: Int,
+    ) {
+        super.onScrollChanged(left, top, oldLeft, oldTop)
+        val deltaY = top - oldTop
+
+        if (deltaY != 0) {
+            val viewportHeight = computeVerticalScrollExtent().coerceAtLeast(0)
+            val scrollableDistance = (computeVerticalScrollRange() - viewportHeight)
+                .coerceAtLeast(0)
+            onRootScrolled?.invoke(
+                deltaY,
+                scrollableDistance,
+                viewportHeight,
+                touchSlopPx,
+            )
+        }
     }
 }

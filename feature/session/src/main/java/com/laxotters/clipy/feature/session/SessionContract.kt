@@ -22,6 +22,7 @@ data class SessionUiState(
     val currentUrlLabel: String = "",
     val canGoBack: Boolean = false,
     val canGoForward: Boolean = false,
+    val isWebViewRootScrolling: Boolean = false,
 ) : UiState {
     companion object {
         fun newSession(
@@ -40,6 +41,12 @@ sealed interface SessionUiEvent : UiEvent {
         val sessionId: String,
     ) : SessionUiEvent
 
+    data object TopBarFoldClicked : SessionUiEvent
+
+    data class BottomSheetValueChanged(
+        val value: ClipyBottomSheetValue,
+    ) : SessionUiEvent
+
     data class PageLoaded(
         val sessionId: String,
         val url: String,
@@ -47,8 +54,11 @@ sealed interface SessionUiEvent : UiEvent {
         val canGoForward: Boolean,
     ) : SessionUiEvent
 
-    data class BottomSheetValueChanged(
-        val value: ClipyBottomSheetValue,
+    data class WebViewRootScrolled(
+        val deltaY: Int,
+        val scrollableDistance: Int,
+        val viewportHeight: Int,
+        val touchSlopPx: Int,
     ) : SessionUiEvent
 }
 
