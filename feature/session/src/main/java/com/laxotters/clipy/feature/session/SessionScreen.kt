@@ -45,6 +45,7 @@ import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.webview.SessionWebView
 import com.laxotters.clipy.feature.session.webview.SessionWebViewController
 import com.laxotters.clipy.feature.session.webview.rememberSessionWebViewController
+import kotlinx.coroutines.flow.collect
 
 @Composable
 fun SessionRoute(
@@ -62,13 +63,9 @@ fun SessionRoute(
         SessionUiState(sessionId = sessionId)
     }
 
-    LaunchedEffect(sessionId) { viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = sessionId)) }
+    BackHandler { viewModel.dispatch(SessionUiEvent.SystemBackPressed) }
 
-    SessionBackHandler(
-        canGoBack = screenState.canGoBack,
-        onWebViewBack = webViewController::goBack,
-        onSessionExit = onHomeClick,
-    )
+    LaunchedEffect(sessionId) { viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = sessionId)) }
 
     SessionScreen(
         state = screenState,
@@ -108,6 +105,15 @@ fun SessionRoute(
             modifier = Modifier.fillMaxSize(),
         )
     }
+
+    LaunchedEffect(viewModel.effect) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                SessionUiSideEffect.GoBackInWebView -> webViewController.goBack()
+                SessionUiSideEffect.NavigateToHome -> onHomeClick()
+            }
+        }
+    }
 }
 
 @Composable
@@ -137,21 +143,6 @@ private fun SessionWebViewHost(
             onRootScrolled = onRootScrolled,
             modifier = modifier,
         )
-    }
-}
-
-@Composable
-private fun SessionBackHandler(
-    canGoBack: Boolean,
-    onWebViewBack: () -> Unit,
-    onSessionExit: () -> Unit,
-) {
-    BackHandler {
-        if (canGoBack) {
-            onWebViewBack()
-        } else {
-            onSessionExit()
-        }
     }
 }
 

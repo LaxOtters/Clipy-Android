@@ -38,6 +38,8 @@ class SessionViewModel @Inject constructor() :
                 viewportHeight = event.viewportHeight,
                 touchSlopPx = event.touchSlopPx,
             )
+
+            SessionUiEvent.SystemBackPressed -> resolveSystemBack()
         }
     }
 
@@ -124,6 +126,23 @@ class SessionViewModel @Inject constructor() :
                     viewportHeight = viewportHeight,
                 ),
             )
+        }
+    }
+
+    private fun resolveSystemBack() {
+        resetWebViewRootScrollTracking()
+        val state = currentState
+        val sheetTarget = SessionChromeStatePolicy.collapseSheetForBack(
+            state.bottomSheetState,
+        )
+
+        when {
+            sheetTarget != null -> updateState {
+                copy(bottomSheetState = sheetTarget)
+            }
+
+            state.canGoBack -> postSideEffect(SessionUiSideEffect.GoBackInWebView)
+            else -> postSideEffect(SessionUiSideEffect.NavigateToHome)
         }
     }
 

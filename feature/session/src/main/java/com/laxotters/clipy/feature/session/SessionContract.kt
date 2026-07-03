@@ -60,6 +60,11 @@ sealed interface SessionUiEvent : UiEvent {
         val viewportHeight: Int,
         val touchSlopPx: Int,
     ) : SessionUiEvent
+
+    data object SystemBackPressed : SessionUiEvent
 }
 
-sealed interface SessionUiSideEffect : UiSideEffect
+sealed interface SessionUiSideEffect : UiSideEffect {
+    data object GoBackInWebView : SessionUiSideEffect
+    data object NavigateToHome : SessionUiSideEffect
+}
