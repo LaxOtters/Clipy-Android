@@ -233,7 +233,7 @@ private fun SectionTitle(text: String) {
 @Preview(showBackground = true, widthDp = 390)
 @Composable
 private fun FoundationCatalogPreview() {
-    ClipyTheme(dynamicColor = false) {
+    ClipyTheme {
         FoundationCatalogScreen()
     }
 }
