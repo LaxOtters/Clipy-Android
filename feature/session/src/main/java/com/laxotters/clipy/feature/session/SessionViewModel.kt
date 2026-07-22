@@ -1,7 +1,7 @@
 package com.laxotters.clipy.feature.session
 
 import androidx.lifecycle.viewModelScope
-import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetValue
+import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetValue
 import com.laxotters.clipy.core.ui.base.BaseViewModel
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.policy.SessionChromeSnapshot

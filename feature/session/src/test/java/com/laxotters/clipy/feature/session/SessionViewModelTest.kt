@@ -1,6 +1,6 @@
 package com.laxotters.clipy.feature.session
 
-import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetValue
+import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetValue
 import com.laxotters.clipy.domain.model.BottomSheetState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first

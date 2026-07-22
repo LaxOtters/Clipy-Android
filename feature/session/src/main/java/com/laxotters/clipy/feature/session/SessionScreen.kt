@@ -37,9 +37,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetDefaults.HeaderHeight
-import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetLayout
-import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetValue
+import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetDefaults.HeaderHeight
+import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetLayout
+import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetValue
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.webview.SessionWebView

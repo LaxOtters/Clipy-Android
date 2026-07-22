@@ -1,4 +1,4 @@
-package com.laxotters.clipy.core.designsystem.component
+package com.laxotters.clipy.core.designsystem.component.bottomsheet
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable

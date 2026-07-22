@@ -1,4 +1,4 @@
-package com.laxotters.clipy.core.designsystem.component
+package com.laxotters.clipy.core.designsystem.component.bottomsheet
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
