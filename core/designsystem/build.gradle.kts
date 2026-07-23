@@ -7,6 +7,12 @@ plugins {
 
 setNamespace("core.designsystem")
 
+android {
+    buildFeatures {
+        buildConfig = true
+    }
+}
+
 dependencies {
     testImplementation(libs.junit)
 }
