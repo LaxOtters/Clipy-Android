@@ -37,9 +37,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetDefaults.HeaderHeight
+import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetDefaults.HeaderHeight
+import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetLayout
-import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetValue
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.webview.SessionWebView
@@ -149,7 +149,7 @@ private fun SessionWebViewHost(
 private data class ScreenActions(
     val topBarActions: TopBarActions,
     val browserBarActions: BrowserBarActions,
-    val onBottomSheetValueChange: (ClipyBottomSheetValue) -> Unit,
+    val onBottomSheetValueChange: (BottomSheetValue) -> Unit,
 )
 
 private data class TopBarActions(
@@ -197,7 +197,7 @@ private fun SessionScreen(
                 .height(70.dp),
         )
         ClipyBottomSheetLayout(
-            value = state.bottomSheetState.toClipyBottomSheetValue(),
+            value = state.bottomSheetState.toBottomSheetValue(),
             onValueChange = { bottomSheetValue ->
                 actions.onBottomSheetValueChange(bottomSheetValue)
             },
@@ -293,14 +293,14 @@ private fun SessionTopBar(
 
 @Composable
 private fun SheetHeader(
-    value: ClipyBottomSheetValue,
+    value: BottomSheetValue,
     browserBarState: BrowserBarState,
     browserBarActions: BrowserBarActions,
     modifier: Modifier = Modifier,
 ) {
     when (value) {
-        ClipyBottomSheetValue.MINIMIZED,
-        ClipyBottomSheetValue.PEEK,
+        BottomSheetValue.MINIMIZED,
+        BottomSheetValue.PEEK,
         -> BrowserBar(
             state = browserBarState,
             actions = browserBarActions,
@@ -309,15 +309,15 @@ private fun SheetHeader(
                 .padding(horizontal = 20.dp),
         )
 
-        ClipyBottomSheetValue.HIDDEN,
-        ClipyBottomSheetValue.EXPANDED,
+        BottomSheetValue.HIDDEN,
+        BottomSheetValue.EXPANDED,
         -> Unit
     }
 }
 
 @Composable
 private fun SheetContent(
-    value: ClipyBottomSheetValue,
+    value: BottomSheetValue,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -327,10 +327,10 @@ private fun SheetContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         when (value) {
-            ClipyBottomSheetValue.HIDDEN -> Unit
-            ClipyBottomSheetValue.MINIMIZED -> Unit
-            ClipyBottomSheetValue.PEEK -> PeekPlaceholder()
-            ClipyBottomSheetValue.EXPANDED -> ExpandedPlaceholder()
+            BottomSheetValue.HIDDEN -> Unit
+            BottomSheetValue.MINIMIZED -> Unit
+            BottomSheetValue.PEEK -> PeekPlaceholder()
+            BottomSheetValue.EXPANDED -> ExpandedPlaceholder()
         }
     }
 }
@@ -532,10 +532,10 @@ private fun SessionScreenPreview() {
     }
 }
 
-private fun BottomSheetState.toClipyBottomSheetValue(): ClipyBottomSheetValue =
+private fun BottomSheetState.toBottomSheetValue(): BottomSheetValue =
     when (this) {
-        BottomSheetState.HIDDEN -> ClipyBottomSheetValue.HIDDEN
-        BottomSheetState.MINIMIZED -> ClipyBottomSheetValue.MINIMIZED
-        BottomSheetState.PEEK -> ClipyBottomSheetValue.PEEK
-        BottomSheetState.EXPANDED -> ClipyBottomSheetValue.EXPANDED
+        BottomSheetState.HIDDEN -> BottomSheetValue.HIDDEN
+        BottomSheetState.MINIMIZED -> BottomSheetValue.MINIMIZED
+        BottomSheetState.PEEK -> BottomSheetValue.PEEK
+        BottomSheetState.EXPANDED -> BottomSheetValue.EXPANDED
     }

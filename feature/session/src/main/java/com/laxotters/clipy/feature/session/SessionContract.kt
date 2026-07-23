@@ -1,6 +1,6 @@
 package com.laxotters.clipy.feature.session
 
-import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetValue
+import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
 import com.laxotters.clipy.core.ui.base.UiEvent
 import com.laxotters.clipy.core.ui.base.UiSideEffect
 import com.laxotters.clipy.core.ui.base.UiState
@@ -44,7 +44,7 @@ sealed interface SessionUiEvent : UiEvent {
     data object TopBarFoldClicked : SessionUiEvent
 
     data class BottomSheetValueChanged(
-        val value: ClipyBottomSheetValue,
+        val value: BottomSheetValue,
     ) : SessionUiEvent
 
     data class PageLoaded(

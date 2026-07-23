@@ -2,36 +2,36 @@ package com.laxotters.clipy.core.designsystem.component.bottomsheet
 
 import kotlin.math.abs
 
-/** 상태별 sheet top anchor(offsetY)입니다. */
-internal data class ClipyBottomSheetAnchors(
+/** 상태별 BottomSheet top anchor(offsetY)입니다. */
+internal data class BottomSheetAnchors(
     val expanded: Float,
     val peek: Float,
     val minimized: Float,
     val hidden: Float,
 ) {
-    fun offsetFor(value: ClipyBottomSheetValue): Float =
+    fun offsetFor(value: BottomSheetValue): Float =
         when (value) {
-            ClipyBottomSheetValue.HIDDEN -> hidden
-            ClipyBottomSheetValue.MINIMIZED -> minimized
-            ClipyBottomSheetValue.PEEK -> peek
-            ClipyBottomSheetValue.EXPANDED -> expanded
+            BottomSheetValue.HIDDEN -> hidden
+            BottomSheetValue.MINIMIZED -> minimized
+            BottomSheetValue.PEEK -> peek
+            BottomSheetValue.EXPANDED -> expanded
         }
 }
 
 /** drag 종료 후 target state를 판단할 때 사용하는 drag 결과입니다. */
-internal data class ClipyBottomSheetDragEnd(
+internal data class BottomSheetDragEnd(
     val translationY: Float,
     val velocityY: Float,
     val endOffsetY: Float,
 )
 
 /** headerContent와 sheetContent에 전달할 value 판단에 필요한 현재 sheet 정보입니다. */
-internal data class ClipyBottomSheetContentContext(
-    val currentValue: ClipyBottomSheetValue,
+internal data class BottomSheetContentContext(
+    val currentValue: BottomSheetValue,
     val offsetY: Float,
     val translationY: Float,
     val isDragging: Boolean,
-    val settlingTargetValue: ClipyBottomSheetValue?,
+    val settlingTargetValue: BottomSheetValue?,
 )
 
 /**
@@ -41,12 +41,12 @@ internal data class ClipyBottomSheetContentContext(
  * anchor는 BottomSheet top의 offsetY입니다.
  * offsetY가 작을수록 sheet는 위에 있고, 커질수록 아래로 내려갑니다.
  */
-internal data class ClipyBottomSheetPolicy(
-    val anchors: ClipyBottomSheetAnchors,
+internal data class BottomSheetPolicy(
+    val anchors: BottomSheetAnchors,
     val velocityThreshold: Float,
     val retentionBand: Float,
 ) {
-    fun offsetFor(value: ClipyBottomSheetValue): Float =
+    fun offsetFor(value: BottomSheetValue): Float =
         anchors.offsetFor(value)
 
     fun clampOffsetY(offsetY: Float): Float =
@@ -56,11 +56,11 @@ internal data class ClipyBottomSheetPolicy(
         )
 
     fun targetValue(
-        from: ClipyBottomSheetValue,
-        dragEnd: ClipyBottomSheetDragEnd,
-    ): ClipyBottomSheetValue {
-        if (from == ClipyBottomSheetValue.HIDDEN) {
-            return ClipyBottomSheetValue.HIDDEN
+        from: BottomSheetValue,
+        dragEnd: BottomSheetDragEnd,
+    ): BottomSheetValue {
+        if (from == BottomSheetValue.HIDDEN) {
+            return BottomSheetValue.HIDDEN
         }
 
         val fastDirection = fastDragDirection(dragEnd.velocityY)
@@ -78,7 +78,7 @@ internal data class ClipyBottomSheetPolicy(
         )
     }
 
-    fun valueForContent(context: ClipyBottomSheetContentContext): ClipyBottomSheetValue =
+    fun valueForContent(context: BottomSheetContentContext): BottomSheetValue =
         when {
             context.isDragging -> slowTargetValue(
                 from = context.currentValue,
@@ -90,12 +90,12 @@ internal data class ClipyBottomSheetPolicy(
         }
 
     private fun slowTargetValue(
-        from: ClipyBottomSheetValue,
+        from: BottomSheetValue,
         translationY: Float,
         endOffsetY: Float,
-    ): ClipyBottomSheetValue {
-        if (from == ClipyBottomSheetValue.HIDDEN) {
-            return ClipyBottomSheetValue.HIDDEN
+    ): BottomSheetValue {
+        if (from == BottomSheetValue.HIDDEN) {
+            return BottomSheetValue.HIDDEN
         }
 
         val endOffset = clampOffsetY(endOffsetY)
@@ -126,30 +126,30 @@ internal data class ClipyBottomSheetPolicy(
     }
 
     private fun fastTargetValue(
-        from: ClipyBottomSheetValue,
+        from: BottomSheetValue,
         direction: DragDirection,
-    ): ClipyBottomSheetValue =
+    ): BottomSheetValue =
         when (from) {
-            ClipyBottomSheetValue.HIDDEN -> ClipyBottomSheetValue.HIDDEN
-            ClipyBottomSheetValue.MINIMIZED -> when (direction) {
-                DragDirection.UPWARD -> ClipyBottomSheetValue.EXPANDED
-                DragDirection.DOWNWARD -> ClipyBottomSheetValue.HIDDEN
+            BottomSheetValue.HIDDEN -> BottomSheetValue.HIDDEN
+            BottomSheetValue.MINIMIZED -> when (direction) {
+                DragDirection.UPWARD -> BottomSheetValue.EXPANDED
+                DragDirection.DOWNWARD -> BottomSheetValue.HIDDEN
             }
-            ClipyBottomSheetValue.PEEK -> when (direction) {
-                DragDirection.UPWARD -> ClipyBottomSheetValue.EXPANDED
-                DragDirection.DOWNWARD -> ClipyBottomSheetValue.MINIMIZED
+            BottomSheetValue.PEEK -> when (direction) {
+                DragDirection.UPWARD -> BottomSheetValue.EXPANDED
+                DragDirection.DOWNWARD -> BottomSheetValue.MINIMIZED
             }
-            ClipyBottomSheetValue.EXPANDED -> when (direction) {
-                DragDirection.UPWARD -> ClipyBottomSheetValue.EXPANDED
-                DragDirection.DOWNWARD -> ClipyBottomSheetValue.MINIMIZED
+            BottomSheetValue.EXPANDED -> when (direction) {
+                DragDirection.UPWARD -> BottomSheetValue.EXPANDED
+                DragDirection.DOWNWARD -> BottomSheetValue.MINIMIZED
             }
         }
 
     private fun slowTargetValue(
-        from: ClipyBottomSheetValue,
+        from: BottomSheetValue,
         direction: DragDirection,
         endOffset: Float,
-    ): ClipyBottomSheetValue {
+    ): BottomSheetValue {
         val metrics = SlowDragMetrics(
             currentOffset = anchors.offsetFor(from),
             endOffset = endOffset,
@@ -159,54 +159,54 @@ internal data class ClipyBottomSheetPolicy(
         )
 
         return when (from) {
-            ClipyBottomSheetValue.HIDDEN -> ClipyBottomSheetValue.HIDDEN
-            ClipyBottomSheetValue.EXPANDED -> slowExpandedTarget(direction, metrics)
-            ClipyBottomSheetValue.PEEK -> slowPeekTarget(direction, metrics)
-            ClipyBottomSheetValue.MINIMIZED -> slowMinimizedTarget(direction, metrics)
+            BottomSheetValue.HIDDEN -> BottomSheetValue.HIDDEN
+            BottomSheetValue.EXPANDED -> slowExpandedTarget(direction, metrics)
+            BottomSheetValue.PEEK -> slowPeekTarget(direction, metrics)
+            BottomSheetValue.MINIMIZED -> slowMinimizedTarget(direction, metrics)
         }
     }
 
     private fun slowExpandedTarget(
         direction: DragDirection,
         metrics: SlowDragMetrics,
-    ): ClipyBottomSheetValue =
+    ): BottomSheetValue =
         when (direction) {
-            DragDirection.UPWARD -> ClipyBottomSheetValue.EXPANDED
+            DragDirection.UPWARD -> BottomSheetValue.EXPANDED
             DragDirection.DOWNWARD -> when {
-                metrics.isNearCurrentWhenDraggingDown() -> ClipyBottomSheetValue.EXPANDED
-                metrics.isNearMinimized() -> ClipyBottomSheetValue.MINIMIZED
-                else -> ClipyBottomSheetValue.PEEK
+                metrics.isNearCurrentWhenDraggingDown() -> BottomSheetValue.EXPANDED
+                metrics.isNearMinimized() -> BottomSheetValue.MINIMIZED
+                else -> BottomSheetValue.PEEK
             }
         }
 
     private fun slowPeekTarget(
         direction: DragDirection,
         metrics: SlowDragMetrics,
-    ): ClipyBottomSheetValue =
+    ): BottomSheetValue =
         when (direction) {
             DragDirection.UPWARD -> when {
-                metrics.isNearCurrentWhenDraggingUp() -> ClipyBottomSheetValue.PEEK
-                else -> ClipyBottomSheetValue.EXPANDED
+                metrics.isNearCurrentWhenDraggingUp() -> BottomSheetValue.PEEK
+                else -> BottomSheetValue.EXPANDED
             }
             DragDirection.DOWNWARD -> when {
-                metrics.isNearCurrentWhenDraggingDown() -> ClipyBottomSheetValue.PEEK
-                else -> ClipyBottomSheetValue.MINIMIZED
+                metrics.isNearCurrentWhenDraggingDown() -> BottomSheetValue.PEEK
+                else -> BottomSheetValue.MINIMIZED
             }
         }
 
     private fun slowMinimizedTarget(
         direction: DragDirection,
         metrics: SlowDragMetrics,
-    ): ClipyBottomSheetValue =
+    ): BottomSheetValue =
         when (direction) {
             DragDirection.UPWARD -> when {
-                metrics.isNearCurrentWhenDraggingUp() -> ClipyBottomSheetValue.MINIMIZED
-                metrics.isNearExpanded() -> ClipyBottomSheetValue.EXPANDED
-                else -> ClipyBottomSheetValue.PEEK
+                metrics.isNearCurrentWhenDraggingUp() -> BottomSheetValue.MINIMIZED
+                metrics.isNearExpanded() -> BottomSheetValue.EXPANDED
+                else -> BottomSheetValue.PEEK
             }
             DragDirection.DOWNWARD -> when {
-                metrics.isNearCurrentWhenDraggingDown() -> ClipyBottomSheetValue.MINIMIZED
-                else -> ClipyBottomSheetValue.HIDDEN
+                metrics.isNearCurrentWhenDraggingDown() -> BottomSheetValue.MINIMIZED
+                else -> BottomSheetValue.HIDDEN
             }
         }
 

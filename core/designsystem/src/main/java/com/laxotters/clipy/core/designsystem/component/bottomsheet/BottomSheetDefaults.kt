@@ -7,7 +7,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 
-object ClipyBottomSheetDefaults {
+object BottomSheetDefaults {
     val HandleHeight: Dp = 32.dp
     val HeaderHeight: Dp = 44.dp
     val BottomPadding: Dp = 32.dp
