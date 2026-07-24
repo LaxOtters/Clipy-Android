@@ -1,7 +1,7 @@
 package com.laxotters.clipy.feature.session
 
 import androidx.lifecycle.viewModelScope
-import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetValue
+import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
 import com.laxotters.clipy.core.ui.base.BaseViewModel
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.policy.SessionChromeSnapshot
@@ -81,7 +81,7 @@ class SessionViewModel @Inject constructor() :
         }
     }
 
-    private fun syncBottomSheetValue(value: ClipyBottomSheetValue) {
+    private fun syncBottomSheetValue(value: BottomSheetValue) {
         resetWebViewRootScrollTracking()
         updateState {
             copy(bottomSheetState = value.toBottomSheetState())
@@ -187,12 +187,12 @@ private fun SessionUiState.withChromeSnapshot(snapshot: SessionChromeSnapshot): 
         topBarState = snapshot.topBarState,
     )
 
-private fun ClipyBottomSheetValue.toBottomSheetState(): BottomSheetState =
+private fun BottomSheetValue.toBottomSheetState(): BottomSheetState =
     when (this) {
-        ClipyBottomSheetValue.HIDDEN -> BottomSheetState.HIDDEN
-        ClipyBottomSheetValue.MINIMIZED -> BottomSheetState.MINIMIZED
-        ClipyBottomSheetValue.PEEK -> BottomSheetState.PEEK
-        ClipyBottomSheetValue.EXPANDED -> BottomSheetState.EXPANDED
+        BottomSheetValue.HIDDEN -> BottomSheetState.HIDDEN
+        BottomSheetValue.MINIMIZED -> BottomSheetState.MINIMIZED
+        BottomSheetValue.PEEK -> BottomSheetState.PEEK
+        BottomSheetValue.EXPANDED -> BottomSheetState.EXPANDED
     }
 
 // root scroll 진행 상태를 idle로 되돌리기 전 기다리는 시간입니다.

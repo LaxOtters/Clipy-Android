@@ -1,6 +1,6 @@
 package com.laxotters.clipy.feature.session
 
-import com.laxotters.clipy.core.designsystem.component.ClipyBottomSheetValue
+import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
 import com.laxotters.clipy.domain.model.BottomSheetState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -41,7 +41,7 @@ class SessionViewModelTest {
     fun changedState_newSessionEntered_resetsToInitialUiState() {
         val viewModel = SessionViewModel()
 
-        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(ClipyBottomSheetValue.EXPANDED))
+        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.EXPANDED))
         viewModel.dispatch(
             SessionUiEvent.ScreenEntered(
                 sessionId = "session-1",
@@ -61,7 +61,7 @@ class SessionViewModelTest {
         val viewModel = SessionViewModel()
         viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
         viewModel.dispatch(SessionUiEvent.TopBarFoldClicked)
-        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(ClipyBottomSheetValue.HIDDEN))
+        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.HIDDEN))
 
         viewModel.dispatch(
             SessionUiEvent.PageLoaded(
@@ -163,10 +163,10 @@ class SessionViewModelTest {
         val viewModel = SessionViewModel()
         viewModel.dispatch(SessionUiEvent.TopBarFoldClicked)
         val cases = listOf(
-            ClipyBottomSheetValue.HIDDEN to BottomSheetState.HIDDEN,
-            ClipyBottomSheetValue.MINIMIZED to BottomSheetState.MINIMIZED,
-            ClipyBottomSheetValue.PEEK to BottomSheetState.PEEK,
-            ClipyBottomSheetValue.EXPANDED to BottomSheetState.EXPANDED,
+            BottomSheetValue.HIDDEN to BottomSheetState.HIDDEN,
+            BottomSheetValue.MINIMIZED to BottomSheetState.MINIMIZED,
+            BottomSheetValue.PEEK to BottomSheetState.PEEK,
+            BottomSheetValue.EXPANDED to BottomSheetState.EXPANDED,
         )
 
         cases.forEach { (value, expectedState) ->
@@ -183,7 +183,7 @@ class SessionViewModelTest {
     fun topBarFoldClicked_dispatchEvent_updatesChromeState() {
         val viewModel = SessionViewModel()
         viewModel.dispatch(SessionUiEvent.TopBarFoldClicked)
-        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(ClipyBottomSheetValue.HIDDEN))
+        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.HIDDEN))
 
         viewModel.dispatch(SessionUiEvent.TopBarFoldClicked)
         val state = viewModel.state.value
@@ -215,7 +215,7 @@ class SessionViewModelTest {
     fun webViewRootScrolled_dispatchEvent_updatesBrowsingChromeState() {
         val viewModel = SessionViewModel()
         viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
-        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(ClipyBottomSheetValue.MINIMIZED))
+        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.MINIMIZED))
 
         viewModel.dispatch(
             SessionUiEvent.WebViewRootScrolled(
@@ -247,7 +247,7 @@ class SessionViewModelTest {
     fun webViewRootScrolled_belowTouchSlop_keepsChromeState() {
         val viewModel = SessionViewModel()
         viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
-        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(ClipyBottomSheetValue.MINIMIZED))
+        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.MINIMIZED))
 
         viewModel.dispatch(
             SessionUiEvent.WebViewRootScrolled(
@@ -267,7 +267,7 @@ class SessionViewModelTest {
     @Test
     fun systemBackPressed_expandedSheet_collapsesToPeek() {
         val viewModel = SessionViewModel()
-        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(ClipyBottomSheetValue.EXPANDED))
+        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.EXPANDED))
 
         viewModel.dispatch(SessionUiEvent.SystemBackPressed)
         val state = viewModel.state.value

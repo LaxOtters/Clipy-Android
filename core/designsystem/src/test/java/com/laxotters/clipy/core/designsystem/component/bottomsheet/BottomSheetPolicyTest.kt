@@ -1,11 +1,11 @@
-package com.laxotters.clipy.core.designsystem.component
+package com.laxotters.clipy.core.designsystem.component.bottomsheet
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class ClipyBottomSheetPolicyTest {
-    private val policy = ClipyBottomSheetPolicy(
-        anchors = ClipyBottomSheetAnchors(
+class BottomSheetPolicyTest {
+    private val policy = BottomSheetPolicy(
+        anchors = BottomSheetAnchors(
             expanded = 0f,
             peek = 400f,
             minimized = 700f,
@@ -17,7 +17,7 @@ class ClipyBottomSheetPolicyTest {
 
     @Test
     fun offsetFor_returnsAnchorForState() {
-        assertEquals(400f, policy.offsetFor(ClipyBottomSheetValue.PEEK), 0f)
+        assertEquals(400f, policy.offsetFor(BottomSheetValue.PEEK), 0f)
     }
 
     @Test
@@ -29,68 +29,68 @@ class ClipyBottomSheetPolicyTest {
     @Test
     fun offsetInsideRetentionBand_slowDragRelease_keepsCurrentValue() {
         val targetValue = targetValue(
-            currentValue = ClipyBottomSheetValue.PEEK,
+            currentValue = BottomSheetValue.PEEK,
             endOffsetY = 410f,
             translationY = 10f,
         )
 
-        assertEquals(ClipyBottomSheetValue.PEEK, targetValue)
+        assertEquals(BottomSheetValue.PEEK, targetValue)
     }
 
     @Test
     fun minimizedDragUp_insideExpandedAnchorBand_targetsExpanded() {
         val targetValue = targetValue(
-            currentValue = ClipyBottomSheetValue.MINIMIZED,
+            currentValue = BottomSheetValue.MINIMIZED,
             endOffsetY = 20f,
             translationY = -680f,
         )
 
-        assertEquals(ClipyBottomSheetValue.EXPANDED, targetValue)
+        assertEquals(BottomSheetValue.EXPANDED, targetValue)
     }
 
     @Test
     fun minimizedDragUp_beforeExpandedAnchorBand_targetsPeek() {
         val targetValue = targetValue(
-            currentValue = ClipyBottomSheetValue.MINIMIZED,
+            currentValue = BottomSheetValue.MINIMIZED,
             endOffsetY = 380f,
             translationY = -320f,
         )
 
-        assertEquals(ClipyBottomSheetValue.PEEK, targetValue)
+        assertEquals(BottomSheetValue.PEEK, targetValue)
     }
 
     @Test
     fun slowDragRelease_targetValue_resolvesByAnchorAndDirection() {
         val cases = listOf(
             DragCase(
-                currentValue = ClipyBottomSheetValue.EXPANDED,
+                currentValue = BottomSheetValue.EXPANDED,
                 endOffsetY = 390f,
                 translationY = 390f,
-                expectedValue = ClipyBottomSheetValue.PEEK,
+                expectedValue = BottomSheetValue.PEEK,
             ),
             DragCase(
-                currentValue = ClipyBottomSheetValue.EXPANDED,
+                currentValue = BottomSheetValue.EXPANDED,
                 endOffsetY = 690f,
                 translationY = 690f,
-                expectedValue = ClipyBottomSheetValue.MINIMIZED,
+                expectedValue = BottomSheetValue.MINIMIZED,
             ),
             DragCase(
-                currentValue = ClipyBottomSheetValue.MINIMIZED,
+                currentValue = BottomSheetValue.MINIMIZED,
                 endOffsetY = 730f,
                 translationY = 30f,
-                expectedValue = ClipyBottomSheetValue.HIDDEN,
+                expectedValue = BottomSheetValue.HIDDEN,
             ),
             DragCase(
-                currentValue = ClipyBottomSheetValue.PEEK,
+                currentValue = BottomSheetValue.PEEK,
                 endOffsetY = 370f,
                 translationY = -30f,
-                expectedValue = ClipyBottomSheetValue.EXPANDED,
+                expectedValue = BottomSheetValue.EXPANDED,
             ),
             DragCase(
-                currentValue = ClipyBottomSheetValue.PEEK,
+                currentValue = BottomSheetValue.PEEK,
                 endOffsetY = 970f,
                 translationY = 570f,
-                expectedValue = ClipyBottomSheetValue.MINIMIZED,
+                expectedValue = BottomSheetValue.MINIMIZED,
             ),
         )
 
@@ -109,10 +109,10 @@ class ClipyBottomSheetPolicyTest {
     @Test
     fun fastUpwardVelocity_targetValue_resolvesByDirectionPolicy() {
         val cases = listOf(
-            ClipyBottomSheetValue.HIDDEN to ClipyBottomSheetValue.HIDDEN,
-            ClipyBottomSheetValue.MINIMIZED to ClipyBottomSheetValue.EXPANDED,
-            ClipyBottomSheetValue.PEEK to ClipyBottomSheetValue.EXPANDED,
-            ClipyBottomSheetValue.EXPANDED to ClipyBottomSheetValue.EXPANDED,
+            BottomSheetValue.HIDDEN to BottomSheetValue.HIDDEN,
+            BottomSheetValue.MINIMIZED to BottomSheetValue.EXPANDED,
+            BottomSheetValue.PEEK to BottomSheetValue.EXPANDED,
+            BottomSheetValue.EXPANDED to BottomSheetValue.EXPANDED,
         )
 
         cases.forEach { (currentValue, expectedValue) ->
@@ -130,10 +130,10 @@ class ClipyBottomSheetPolicyTest {
     @Test
     fun fastDownwardVelocity_targetValue_resolvesByDirectionPolicy() {
         val cases = listOf(
-            ClipyBottomSheetValue.HIDDEN to ClipyBottomSheetValue.HIDDEN,
-            ClipyBottomSheetValue.EXPANDED to ClipyBottomSheetValue.MINIMIZED,
-            ClipyBottomSheetValue.PEEK to ClipyBottomSheetValue.MINIMIZED,
-            ClipyBottomSheetValue.MINIMIZED to ClipyBottomSheetValue.HIDDEN,
+            BottomSheetValue.HIDDEN to BottomSheetValue.HIDDEN,
+            BottomSheetValue.EXPANDED to BottomSheetValue.MINIMIZED,
+            BottomSheetValue.PEEK to BottomSheetValue.MINIMIZED,
+            BottomSheetValue.MINIMIZED to BottomSheetValue.HIDDEN,
         )
 
         cases.forEach { (currentValue, expectedValue) ->
@@ -151,8 +151,8 @@ class ClipyBottomSheetPolicyTest {
     @Test
     fun dragging_valueForContent_resolvesBySlowDragPolicy() {
         val valueForContent = policy.valueForContent(
-            ClipyBottomSheetContentContext(
-                currentValue = ClipyBottomSheetValue.MINIMIZED,
+            BottomSheetContentContext(
+                currentValue = BottomSheetValue.MINIMIZED,
                 offsetY = 380f,
                 translationY = -320f,
                 isDragging = true,
@@ -160,33 +160,33 @@ class ClipyBottomSheetPolicyTest {
             ),
         )
 
-        assertEquals(ClipyBottomSheetValue.PEEK, valueForContent)
+        assertEquals(BottomSheetValue.PEEK, valueForContent)
     }
 
     @Test
     fun settlingTargetValue_valueForContent_keepsSettlingTargetValue() {
         val valueForContent = policy.valueForContent(
-            ClipyBottomSheetContentContext(
-                currentValue = ClipyBottomSheetValue.MINIMIZED,
+            BottomSheetContentContext(
+                currentValue = BottomSheetValue.MINIMIZED,
                 offsetY = 710f,
                 translationY = 0f,
                 isDragging = false,
-                settlingTargetValue = ClipyBottomSheetValue.PEEK,
+                settlingTargetValue = BottomSheetValue.PEEK,
             ),
         )
 
-        assertEquals(ClipyBottomSheetValue.PEEK, valueForContent)
+        assertEquals(BottomSheetValue.PEEK, valueForContent)
     }
 
     private fun targetValue(
-        currentValue: ClipyBottomSheetValue,
+        currentValue: BottomSheetValue,
         endOffsetY: Float,
         translationY: Float = 0f,
         velocityY: Float = 0f,
-    ): ClipyBottomSheetValue =
+    ): BottomSheetValue =
         policy.targetValue(
             from = currentValue,
-            dragEnd = ClipyBottomSheetDragEnd(
+            dragEnd = BottomSheetDragEnd(
                 translationY = translationY,
                 velocityY = velocityY,
                 endOffsetY = endOffsetY,
@@ -194,10 +194,10 @@ class ClipyBottomSheetPolicyTest {
         )
 
     private data class DragCase(
-        val currentValue: ClipyBottomSheetValue,
+        val currentValue: BottomSheetValue,
         val endOffsetY: Float,
         val translationY: Float,
-        val expectedValue: ClipyBottomSheetValue,
+        val expectedValue: BottomSheetValue,
     )
 
     private companion object {
