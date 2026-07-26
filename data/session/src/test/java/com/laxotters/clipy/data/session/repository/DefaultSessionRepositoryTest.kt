@@ -1,6 +1,7 @@
 package com.laxotters.clipy.data.session.repository
 
 import android.content.Context
+import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.laxotters.clipy.data.storage.room.ClipyDatabase
@@ -22,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,6 +72,45 @@ class DefaultSessionRepositoryTest {
         sessionRepository.saveSessionSnapshot(sessionSnapshot)
 
         assertEquals(sessionSnapshot, sessionRepository.getSessionSnapshot(sessionSnapshot.session.id))
+    }
+
+    @Test
+    fun viewStateSaveFails_saveSessionSnapshot_rollsBackSessionInsert() {
+        val sessionSnapshot = sessionSnapshot(
+            session = session(
+                status = SessionStatus.DRAFT,
+                items = emptyList(),
+                decisions = emptyList(),
+            ),
+            viewState = sessionViewState(viewStateSessionId = differentSessionId),
+        )
+
+        assertThrows(SQLiteConstraintException::class.java) {
+            runBlocking { sessionRepository.saveSessionSnapshot(sessionSnapshot) }
+        }
+
+        val savedSession = runBlocking {
+            database.sessionDao().getSessionWithDetails(sessionSnapshot.session.id.toString())
+        }
+        assertNull(savedSession)
+    }
+
+    @Test
+    fun duplicateSessionId_saveSessionSnapshot_keepsOriginalSnapshot() {
+        val originalSnapshot = sessionSnapshot()
+        val duplicateSnapshot = sessionSnapshot(
+            session = session(status = SessionStatus.ABANDONED),
+        )
+        runBlocking { sessionRepository.saveSessionSnapshot(originalSnapshot) }
+
+        assertThrows(SQLiteConstraintException::class.java) {
+            runBlocking { sessionRepository.saveSessionSnapshot(duplicateSnapshot) }
+        }
+
+        val savedSnapshot = runBlocking {
+            sessionRepository.getSessionSnapshot(originalSnapshot.session.id)
+        }
+        assertEquals(originalSnapshot, savedSnapshot)
     }
 
     @Test
@@ -137,8 +178,10 @@ class DefaultSessionRepositoryTest {
         decisions = decisions,
     )
 
-    private fun sessionViewState() = SessionViewState(
-        sessionId = sessionId,
+    private fun sessionViewState(
+        viewStateSessionId: UUID = sessionId,
+    ) = SessionViewState(
+        sessionId = viewStateSessionId,
         lastWebUrl = "https://example.com/session",
         bottomSheetState = BottomSheetState.EXPANDED,
         lastOpenedAt = Instant.ofEpochMilli(4_000L),
@@ -197,6 +240,7 @@ class DefaultSessionRepositoryTest {
 
     private companion object {
         val sessionId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val differentSessionId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")
         val itemId1: UUID = UUID.fromString("00000000-0000-0000-0000-000000000011")
         val itemId2: UUID = UUID.fromString("00000000-0000-0000-0000-000000000012")
         val captureId1: UUID = UUID.fromString("00000000-0000-0000-0000-000000000021")

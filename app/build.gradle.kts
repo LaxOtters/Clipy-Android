@@ -35,5 +35,6 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(project(":data:session"))
     implementation(project(":feature:main"))
 }
