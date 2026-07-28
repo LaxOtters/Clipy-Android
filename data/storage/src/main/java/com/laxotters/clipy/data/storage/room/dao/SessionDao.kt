@@ -2,6 +2,7 @@ package com.laxotters.clipy.data.storage.room.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import com.laxotters.clipy.data.storage.room.entity.CaptureEntity
@@ -13,7 +14,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SessionDao {
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertSession(session: SessionEntity)
 
     @Insert

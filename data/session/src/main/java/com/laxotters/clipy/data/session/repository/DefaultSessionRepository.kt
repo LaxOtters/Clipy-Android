@@ -15,7 +15,9 @@ class DefaultSessionRepository @Inject constructor(
     private val sessionDao = database.sessionDao()
     private val sessionViewStateDao = database.sessionViewStateDao()
 
-    override suspend fun saveSessionSnapshot(sessionSnapshot: SessionSnapshot) {
+    override suspend fun saveSessionSnapshot(
+        sessionSnapshot: SessionSnapshot,
+    ) {
         database.withTransaction {
             val session = sessionSnapshot.session
             val items = session.items.map { it.toEntity() }
@@ -23,6 +25,7 @@ class DefaultSessionRepository @Inject constructor(
             val decisions = session.decisions.map { it.toEntity() }
 
             sessionDao.insertSession(session.toEntity())
+
             if (items.isNotEmpty()) sessionDao.insertItems(items)
             if (captures.isNotEmpty()) sessionDao.insertCaptures(captures)
             if (decisions.isNotEmpty()) sessionDao.insertDecisions(decisions)
