@@ -1,12 +1,13 @@
 package com.laxotters.clipy.feature.session
 
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
+import com.laxotters.clipy.core.navigation.Route
 import com.laxotters.clipy.domain.model.BottomSheetState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 
@@ -14,52 +15,42 @@ class SessionViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    // Initial state
     @Test
-    fun initialState_createViewModel_hasInitialUiState() {
-        val viewModel = SessionViewModel()
+    fun initialState_routeIsInjected_hasMatchingSessionIdAndInitialUrl() {
+        val viewModel = sessionViewModel(sessionId = "session-1")
         val state = viewModel.state.value
 
-        assertEquals(BottomSheetState.PEEK, state.bottomSheetState)
-        assertEquals(SessionTopBarState.UNFOLDED, state.topBarState)
-        assertNull(state.initialUrl)
-    }
-
-    // Session entry
-    @Test
-    fun screenEntered_dispatchEvent_resolvesInitialUrl() {
-        val viewModel = SessionViewModel()
-
-        viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
-        val state = viewModel.state.value
-
+        assertEquals("session-1", state.sessionId)
         assertEquals(DEFAULT_HOME_URL, state.initialUrl)
         assertEquals("google.com", state.currentUrlLabel)
+        assertEquals(BottomSheetState.PEEK, state.bottomSheetState)
+        assertEquals(SessionTopBarState.UNFOLDED, state.topBarState)
     }
 
     @Test
-    fun changedState_newSessionEntered_resetsToInitialUiState() {
-        val viewModel = SessionViewModel()
-
-        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.EXPANDED))
-        viewModel.dispatch(
-            SessionUiEvent.ScreenEntered(
+    fun differentRoutes_createIndependentViewModelState() {
+        val firstViewModel = sessionViewModel(sessionId = "session-1")
+        firstViewModel.dispatch(
+            SessionUiEvent.PageLoaded(
                 sessionId = "session-1",
+                url = "https://example.com/page",
+                canGoBack = true,
+                canGoForward = false,
             ),
         )
-        val state = viewModel.state.value
+        val secondViewModel = sessionViewModel(sessionId = "session-2")
 
-        assertEquals(BottomSheetState.PEEK, state.bottomSheetState)
-        assertEquals(SessionTopBarState.UNFOLDED, state.topBarState)
-        assertEquals(DEFAULT_HOME_URL, state.initialUrl)
-        assertEquals("google.com", state.currentUrlLabel)
+        assertEquals("https://example.com/page", firstViewModel.state.value.currentUrl)
+        assertEquals("session-2", secondViewModel.state.value.sessionId)
+        assertEquals(DEFAULT_HOME_URL, secondViewModel.state.value.initialUrl)
+        assertEquals("", secondViewModel.state.value.currentUrl)
+        assertFalse(secondViewModel.state.value.canGoBack)
+        assertFalse(secondViewModel.state.value.canGoForward)
     }
 
-    // Page load callback
     @Test
     fun pageLoaded_matchingSessionId_updatesPageStateAndRestoresBrowsingChrome() {
-        val viewModel = SessionViewModel()
-        viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
+        val viewModel = sessionViewModel(sessionId = "session-1")
         viewModel.dispatch(SessionUiEvent.TopBarFoldClicked)
         viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.HIDDEN))
 
@@ -84,8 +75,7 @@ class SessionViewModelTest {
 
     @Test
     fun pageLoaded_staleSessionId_keepsCurrentPageState() {
-        val viewModel = SessionViewModel()
-        viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
+        val viewModel = sessionViewModel(sessionId = "session-1")
         viewModel.dispatch(
             SessionUiEvent.PageLoaded(
                 sessionId = "session-1",
@@ -113,54 +103,8 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun sameSessionReentered_dispatchEvent_keepsResolvedState() {
-        val viewModel = SessionViewModel()
-        viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
-        viewModel.dispatch(
-            SessionUiEvent.PageLoaded(
-                sessionId = "session-1",
-                url = "https://example.com/page",
-                canGoBack = false,
-                canGoForward = false,
-            ),
-        )
-
-        viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
-        val state = viewModel.state.value
-
-        assertEquals(DEFAULT_HOME_URL, state.initialUrl)
-        assertEquals("https://example.com/page", state.currentUrl)
-        assertEquals("example.com", state.currentUrlLabel)
-    }
-
-    @Test
-    fun differentSessionEntered_dispatchEvent_reResolvesState() {
-        val viewModel = SessionViewModel()
-        viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
-        viewModel.dispatch(
-            SessionUiEvent.PageLoaded(
-                sessionId = "session-1",
-                url = "https://example.com/page",
-                canGoBack = true,
-                canGoForward = false,
-            ),
-        )
-
-        viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-2"))
-        val state = viewModel.state.value
-
-        assertEquals("session-2", state.sessionId)
-        assertEquals(DEFAULT_HOME_URL, state.initialUrl)
-        assertEquals("", state.currentUrl)
-        assertEquals("google.com", state.currentUrlLabel)
-        assertEquals(false, state.canGoBack)
-        assertEquals(false, state.canGoForward)
-    }
-
-    // Bottom Sheet direct manipulation
-    @Test
-    fun bottomSheetValueChanged_dispatchEvent_updatesBottomSheetStateAndPreservesTopBar() {
-        val viewModel = SessionViewModel()
+    fun bottomSheetValueChanged_updatesBottomSheetStateAndPreservesTopBar() {
+        val viewModel = sessionViewModel()
         viewModel.dispatch(SessionUiEvent.TopBarFoldClicked)
         val cases = listOf(
             BottomSheetValue.HIDDEN to BottomSheetState.HIDDEN,
@@ -178,10 +122,9 @@ class SessionViewModelTest {
         }
     }
 
-    // Chrome transition events
     @Test
-    fun topBarFoldClicked_dispatchEvent_updatesChromeState() {
-        val viewModel = SessionViewModel()
+    fun topBarFoldClicked_updatesChromeState() {
+        val viewModel = sessionViewModel()
         viewModel.dispatch(SessionUiEvent.TopBarFoldClicked)
         viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.HIDDEN))
 
@@ -194,7 +137,7 @@ class SessionViewModelTest {
 
     @Test
     fun topBarFoldClicked_whileWebViewRootScrolling_keepsChromeState() {
-        val viewModel = SessionViewModel()
+        val viewModel = sessionViewModel()
         viewModel.dispatch(
             SessionUiEvent.WebViewRootScrolled(
                 deltaY = 12,
@@ -212,9 +155,8 @@ class SessionViewModelTest {
     }
 
     @Test
-    fun webViewRootScrolled_dispatchEvent_updatesBrowsingChromeState() {
-        val viewModel = SessionViewModel()
-        viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
+    fun webViewRootScrolled_updatesBrowsingChromeState() {
+        val viewModel = sessionViewModel()
         viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.MINIMIZED))
 
         viewModel.dispatch(
@@ -245,8 +187,7 @@ class SessionViewModelTest {
 
     @Test
     fun webViewRootScrolled_belowTouchSlop_keepsChromeState() {
-        val viewModel = SessionViewModel()
-        viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
+        val viewModel = sessionViewModel()
         viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.MINIMIZED))
 
         viewModel.dispatch(
@@ -263,10 +204,9 @@ class SessionViewModelTest {
         assertEquals(SessionTopBarState.UNFOLDED, state.topBarState)
     }
 
-    // Android system back
     @Test
     fun systemBackPressed_expandedSheet_collapsesToPeek() {
-        val viewModel = SessionViewModel()
+        val viewModel = sessionViewModel()
         viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.EXPANDED))
 
         viewModel.dispatch(SessionUiEvent.SystemBackPressed)
@@ -278,8 +218,7 @@ class SessionViewModelTest {
 
     @Test
     fun systemBackPressed_withHistory_postsWebViewBackSideEffect() = runTest {
-        val viewModel = SessionViewModel()
-        viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = "session-1"))
+        val viewModel = sessionViewModel()
         viewModel.dispatch(
             SessionUiEvent.PageLoaded(
                 sessionId = "session-1",
@@ -297,11 +236,14 @@ class SessionViewModelTest {
 
     @Test
     fun systemBackPressed_withoutHistory_postsNavigateToHomeSideEffect() = runTest {
-        val viewModel = SessionViewModel()
+        val viewModel = sessionViewModel()
         val effect = async { viewModel.effect.first() }
 
         viewModel.dispatch(SessionUiEvent.SystemBackPressed)
 
         assertEquals(SessionUiSideEffect.NavigateToHome, effect.await())
     }
+
+    private fun sessionViewModel(sessionId: String = "session-1") =
+        SessionViewModel(Route.Session(sessionId))
 }
