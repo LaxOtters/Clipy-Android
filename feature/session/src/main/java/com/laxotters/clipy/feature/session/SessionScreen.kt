@@ -35,7 +35,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetDefaults.HeaderHeight
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
@@ -49,29 +48,19 @@ import kotlinx.coroutines.flow.collect
 
 @Composable
 fun SessionRoute(
-    sessionId: String,
-    onHomeClick: () -> Unit = {},
-    viewModel: SessionViewModel = hiltViewModel(),
+    viewModel: SessionViewModel,
+    navigateToHome: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val webViewController = rememberSessionWebViewController()
 
-    val routeInitialUrl = if (state.sessionId == sessionId) state.initialUrl else null
-    val screenState = if (routeInitialUrl != null) {
-        state
-    } else {
-        SessionUiState(sessionId = sessionId)
-    }
-
     BackHandler { viewModel.dispatch(SessionUiEvent.SystemBackPressed) }
 
-    LaunchedEffect(sessionId) { viewModel.dispatch(SessionUiEvent.ScreenEntered(sessionId = sessionId)) }
-
     SessionScreen(
-        state = screenState,
+        state = state,
         actions = ScreenActions(
             topBarActions = TopBarActions(
-                onHomeClick = onHomeClick,
+                onHomeClick = navigateToHome,
                 onAddItemClick = { },
                 onTopBarFoldClick = { viewModel.dispatch(SessionUiEvent.TopBarFoldClicked) },
             ),
@@ -88,8 +77,8 @@ fun SessionRoute(
         ),
     ) {
         SessionWebViewHost(
-            sessionId = sessionId,
-            initialUrl = routeInitialUrl,
+            sessionId = state.sessionId,
+            initialUrl = state.initialUrl,
             controller = webViewController,
             onPageLoaded = viewModel::dispatch,
             onRootScrolled = { deltaY, scrollableDistance, viewportHeight, touchSlopPx ->
@@ -110,7 +99,7 @@ fun SessionRoute(
         viewModel.effect.collect { effect ->
             when (effect) {
                 SessionUiSideEffect.GoBackInWebView -> webViewController.goBack()
-                SessionUiSideEffect.NavigateToHome -> onHomeClick()
+                SessionUiSideEffect.NavigateToHome -> navigateToHome()
             }
         }
     }

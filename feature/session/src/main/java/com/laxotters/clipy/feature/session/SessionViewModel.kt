@@ -2,27 +2,41 @@ package com.laxotters.clipy.feature.session
 
 import androidx.lifecycle.viewModelScope
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
+import com.laxotters.clipy.core.navigation.Route
 import com.laxotters.clipy.core.ui.base.BaseViewModel
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.policy.SessionChromeSnapshot
 import com.laxotters.clipy.feature.session.policy.SessionChromeStatePolicy
 import com.laxotters.clipy.feature.session.policy.SessionRootScrollIntentDetector
 import com.laxotters.clipy.feature.session.util.formatUrlLabel
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@HiltViewModel
-class SessionViewModel @Inject constructor() :
-    BaseViewModel<SessionUiState, SessionUiEvent, SessionUiSideEffect>(SessionUiState()) {
+@HiltViewModel(assistedFactory = SessionViewModel.Factory::class)
+class SessionViewModel @AssistedInject constructor(
+    @Assisted route: Route.Session,
+) :
+    BaseViewModel<SessionUiState, SessionUiEvent, SessionUiSideEffect>(
+        SessionUiState.newSession(
+            sessionId = route.sessionId,
+            initialUrl = DEFAULT_HOME_URL,
+        ),
+    ) {
+    @AssistedFactory
+    interface Factory {
+        fun create(route: Route.Session): SessionViewModel
+    }
+
     private val rootScrollIntentDetector = SessionRootScrollIntentDetector()
     private var rootScrollIdleJob: Job? = null
 
     override fun handleEvent(event: SessionUiEvent) {
         when (event) {
-            is SessionUiEvent.ScreenEntered -> enterSession(event.sessionId)
             SessionUiEvent.TopBarFoldClicked -> applyTopBarFoldPolicy()
             is SessionUiEvent.BottomSheetValueChanged -> syncBottomSheetValue(event.value)
             is SessionUiEvent.PageLoaded -> updatePageState(
@@ -40,21 +54,6 @@ class SessionViewModel @Inject constructor() :
             )
 
             SessionUiEvent.SystemBackPressed -> resolveSystemBack()
-        }
-    }
-
-    private fun enterSession(sessionId: String) {
-        resetWebViewRootScrollTracking()
-        updateState {
-            if (this.sessionId == sessionId && initialUrl != null) {
-                this
-            } else {
-                // TODO: 저장된 세션 lastWebUrl 조회로 DEFAULT_HOME_URL 대체
-                SessionUiState.newSession(
-                    sessionId = sessionId,
-                    initialUrl = DEFAULT_HOME_URL,
-                )
-            }
         }
     }
 

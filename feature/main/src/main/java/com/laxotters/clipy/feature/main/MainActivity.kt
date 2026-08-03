@@ -5,14 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
-import com.laxotters.clipy.feature.home.HomeRoute
-import com.laxotters.clipy.feature.session.SessionRoute
+import com.laxotters.clipy.feature.home.navigation.homeEntry
+import com.laxotters.clipy.feature.main.navigation.rememberAppNavigationState
+import com.laxotters.clipy.feature.main.navigation.rememberAppNavigator
+import com.laxotters.clipy.feature.session.navigation.sessionEntry
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -22,38 +21,29 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ClipyTheme {
-                ClipyApp()
+                ClipyApp(onExit = ::finish)
             }
         }
     }
 }
 
 @Composable
-private fun ClipyApp() {
-    var sessionId by rememberSaveable { mutableStateOf<String?>(null) }
-
-    val selectedSessionId = sessionId
-
-    if (selectedSessionId != null) {
-        SessionRoute(
-            sessionId = selectedSessionId,
-            onHomeClick = {
-                sessionId = null
-            },
-        )
-    } else {
-        HomeRoute(
-            onSessionClick = { nextSessionId ->
-                sessionId = nextSessionId
-            },
-        )
+private fun ClipyApp(
+    onExit: () -> Unit,
+) {
+    val navigationState = rememberAppNavigationState()
+    val navigator = rememberAppNavigator(navigationState)
+    val appEntryProvider = entryProvider {
+        homeEntry(navigateToSession = navigator::navigateToSession)
+        sessionEntry(navigateToHome = navigator::navigateToHome)
     }
-}
 
-@Preview(showBackground = true)
-@Composable
-private fun ClipyAppPreview() {
-    ClipyTheme {
-        ClipyApp()
-    }
+    NavDisplay(
+        entries = navigationState.toEntries(appEntryProvider),
+        onBack = {
+            if (!navigator.goBack()) {
+                onExit()
+            }
+        },
+    )
 }
