@@ -1,0 +1,12 @@
+<resources>
+    <string name="home_hero_title">Start New Session</string>
+    <string name="home_hero_description">Compare products without losing context.</string>
+    <string name="home_begin_comparison">Begin Comparison</string>
+    <string name="home_how_it_works">How Clipy Works</string>
+    <string name="home_browse_title">Browse</string>
+    <string name="home_browse_description">Open the web and explore products.</string>
+    <string name="home_collect_title">Collect</string>
+    <string name="home_collect_description">Save options into one comparison session.</string>
+    <string name="home_decide_title">Decide</string>
+    <string name="home_decide_description">Return later, compare, and choose with context.</string>
+</resources>
