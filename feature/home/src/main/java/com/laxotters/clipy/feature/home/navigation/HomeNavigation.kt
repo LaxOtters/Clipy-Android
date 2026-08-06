@@ -9,6 +9,6 @@ fun EntryProviderScope<NavKey>.homeEntry(
     navigateToSession: (sessionId: String) -> Unit,
 ) {
     entry<Route.Home> {
-        HomeRoute(onSessionClick = navigateToSession)
+        HomeRoute(navigateToSession = navigateToSession)
     }
 }

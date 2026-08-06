@@ -5,9 +5,15 @@ import com.laxotters.clipy.core.ui.base.UiSideEffect
 import com.laxotters.clipy.core.ui.base.UiState
 
 data class HomeUiState(
-    val sessionId: String = "00000000-0000-0000-0000-000000000001",
+    val isStartingSession: Boolean = false,
 ) : UiState
 
-sealed interface HomeUiEvent : UiEvent
+sealed interface HomeUiEvent : UiEvent {
+    data object StartNewSessionClicked : HomeUiEvent
+}
 
-sealed interface HomeUiSideEffect : UiSideEffect
+sealed interface HomeUiSideEffect : UiSideEffect {
+    data class NavigateToSession(
+        val sessionId: String,
+    ) : HomeUiSideEffect
+}

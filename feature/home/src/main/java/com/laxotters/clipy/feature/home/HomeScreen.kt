@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,7 +51,7 @@ import com.laxotters.clipy.core.ui.extension.rememberThrottledClick
 
 @Composable
 fun HomeRoute(
-    onSessionClick: (sessionId: String) -> Unit,
+    navigateToSession: (sessionId: String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -58,9 +59,19 @@ fun HomeRoute(
     HomeScreen(
         state = state,
         onStartNewSessionClick = {
-            onSessionClick(state.sessionId)
+            viewModel.dispatch(HomeUiEvent.StartNewSessionClicked)
         },
     )
+
+    LaunchedEffect(viewModel.effect) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is HomeUiSideEffect.NavigateToSession -> {
+                    navigateToSession(effect.sessionId)
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -89,7 +100,7 @@ private fun HomeScreen(
         ) {
             Spacer(modifier = Modifier.height(30.dp))
             NewSessionHero(
-                enabled = true,
+                enabled = !state.isStartingSession,
                 onClick = onStartNewSessionClick,
             )
             Spacer(modifier = Modifier.height(30.dp))
