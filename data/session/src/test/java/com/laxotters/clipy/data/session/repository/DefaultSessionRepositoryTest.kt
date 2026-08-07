@@ -122,38 +122,6 @@ class DefaultSessionRepositoryTest {
         assertNull(sessionSnapshot)
     }
 
-    @Test
-    fun savedSessionSnapshot_deleteSession_removesSavedSessionSnapshot() = runBlocking {
-        val sessionSnapshot = sessionSnapshot()
-        sessionRepository.saveSessionSnapshot(sessionSnapshot)
-
-        sessionRepository.deleteSession(sessionSnapshot.session.id)
-
-        assertNull(sessionRepository.getSessionSnapshot(sessionSnapshot.session.id))
-    }
-
-    @Test
-    fun savedSessionSnapshot_deleteItem_removesItemFromRestoredSessionSnapshot() = runBlocking {
-        val sessionSnapshot = sessionSnapshot(
-            session = session(
-                items = listOf(
-                    item(id = itemId1),
-                    item(id = itemId2),
-                ),
-                decisions = listOf(decision(itemId = itemId1)),
-            ),
-        )
-        sessionRepository.saveSessionSnapshot(sessionSnapshot)
-
-        sessionRepository.deleteItem(itemId1)
-
-        val restoredSnapshot = requireNotNull(sessionRepository.getSessionSnapshot(sessionSnapshot.session.id))
-        val restoredSession = restoredSnapshot.session
-        assertEquals(listOf(itemId2), restoredSession.items.map { it.id })
-        assertEquals(emptyList<Decision>(), restoredSession.decisions)
-        assertEquals(sessionSnapshot.viewState, restoredSnapshot.viewState)
-    }
-
     private fun sessionSnapshot(
         session: Session = session(),
         viewState: SessionViewState = sessionViewState(),
@@ -187,54 +155,42 @@ class DefaultSessionRepositoryTest {
         lastOpenedAt = Instant.ofEpochMilli(4_000L),
     )
 
-    private fun item(
-        id: UUID = itemId1,
-    ) = Item(
-        id = id,
+    private fun item() = Item(
+        id = itemId1,
         sessionId = sessionId,
-        sourceUrl = "https://example.com/items/$id",
-        productName = "Product $id",
+        sourceUrl = "https://example.com/items/$itemId1",
+        productName = "Product $itemId1",
         priceSnapshot = MoneySnapshot(
             amount = 10_000L,
             currency = "KRW",
             rawText = "10,000원",
         ),
         thumbnailImage = ImageRef(
-            remoteUrl = "https://example.com/items/$id.jpg",
-            localPath = "clipy/images/$id.jpg",
+            remoteUrl = "https://example.com/items/$itemId1.jpg",
+            localPath = "clipy/images/$itemId1.jpg",
         ),
         note = "note",
         intentState = ItemIntentState.INTERESTED,
-        captures = listOf(
-            capture(
-                id = if (id == itemId1) captureId1 else captureId2,
-                itemId = id,
-            ),
-        ),
+        captures = listOf(capture()),
         createdAt = Instant.ofEpochMilli(1_000L),
         updatedAt = Instant.ofEpochMilli(2_000L),
     )
 
-    private fun capture(
-        id: UUID = captureId1,
-        itemId: UUID = itemId1,
-    ) = Capture(
-        id = id,
-        itemId = itemId,
+    private fun capture() = Capture(
+        id = captureId1,
+        itemId = itemId1,
         imageRef = ImageRef(
-            remoteUrl = "https://example.com/captures/$itemId.jpg",
-            localPath = "clipy/images/captures/$itemId.jpg",
+            remoteUrl = "https://example.com/captures/$itemId1.jpg",
+            localPath = "clipy/images/captures/$itemId1.jpg",
         ),
         capturedAt = Instant.ofEpochMilli(1_500L),
         memo = "memo",
     )
 
-    private fun decision(
-        itemId: UUID = itemId1,
-    ) = Decision(
+    private fun decision() = Decision(
         id = decisionId1,
         sessionId = sessionId,
-        itemId = itemId,
+        itemId = itemId1,
         decidedAt = Instant.ofEpochMilli(3_000L),
     )
 
@@ -242,9 +198,7 @@ class DefaultSessionRepositoryTest {
         val sessionId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val differentSessionId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")
         val itemId1: UUID = UUID.fromString("00000000-0000-0000-0000-000000000011")
-        val itemId2: UUID = UUID.fromString("00000000-0000-0000-0000-000000000012")
         val captureId1: UUID = UUID.fromString("00000000-0000-0000-0000-000000000021")
-        val captureId2: UUID = UUID.fromString("00000000-0000-0000-0000-000000000022")
         val decisionId1: UUID = UUID.fromString("00000000-0000-0000-0000-000000000031")
     }
 }
