@@ -5,6 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
@@ -33,6 +37,19 @@ class MainActivity : ComponentActivity() {
 private fun ClipyApp(
     onExit: () -> Unit,
 ) {
+    var isSplashVisible by rememberSaveable {
+        mutableStateOf(true)
+    }
+
+    if (isSplashVisible) {
+        ClipySplashScreen(
+            onAnimationFinished = {
+                isSplashVisible = false
+            },
+        )
+        return
+    }
+
     val navigationState = rememberAppNavigationState()
     val navigator = rememberAppNavigator(navigationState)
     val appEntryProvider = entryProvider {
