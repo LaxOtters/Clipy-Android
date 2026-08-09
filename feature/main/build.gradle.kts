@@ -11,4 +11,9 @@ dependencies {
     implementation(project(":feature:session"))
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+
+    testImplementation(libs.junit)
 }

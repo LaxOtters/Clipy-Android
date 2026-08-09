@@ -37,10 +37,6 @@ data class SessionUiState(
 }
 
 sealed interface SessionUiEvent : UiEvent {
-    data class ScreenEntered(
-        val sessionId: String,
-    ) : SessionUiEvent
-
     data object TopBarFoldClicked : SessionUiEvent
 
     data class BottomSheetValueChanged(
