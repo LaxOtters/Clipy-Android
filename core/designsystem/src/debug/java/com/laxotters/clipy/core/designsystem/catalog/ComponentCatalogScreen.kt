@@ -447,20 +447,6 @@ private fun SnackbarSection(manager: ClipySnackbarManager) {
             },
             size = ButtonSize.Small,
         )
-        CatalogStateLabel("Two-line message with action · Inline")
-        ClipyButton(
-            text = "Show two-line action",
-            onClick = {
-                manager.showSnackbar(
-                    message = "작업을 완료하지 못했습니다.\n잠시 후 다시 시도해주세요.",
-                    action = ClipyTextAction(
-                        label = "재시도",
-                        onClick = {},
-                    ),
-                )
-            },
-            size = ButtonSize.Small,
-        )
         CatalogStateLabel("Long text and action · Stacked")
         ClipyButton(
             text = "Show stacked action",
