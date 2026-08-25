@@ -42,7 +42,7 @@ fun SessionWebView(
         update = { container ->
             controller.attach(container.webView)
 
-            // update는 recomposition마다 호출될 수 있어 같은 URL 중복 로딩을 막습니다.
+            // 전달된 URL이 바뀔 때만 새 탐색을 시작해 기존 WebView 상태를 유지합니다.
             if (url != null && loadState.loadedUrl != url) {
                 loadState.loadedUrl = url
                 container.webView.loadUrl(url)
@@ -67,6 +67,8 @@ private fun WebView.configureSessionWebView(
 ) {
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
+    settings.setSupportMultipleWindows(false)
+    settings.javaScriptCanOpenWindowsAutomatically = false
     webViewClient = object : WebViewClient() {
         override fun onPageFinished(view: WebView, url: String?) {
             onPageStateChanged(
