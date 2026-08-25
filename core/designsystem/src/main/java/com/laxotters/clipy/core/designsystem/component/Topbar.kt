@@ -119,7 +119,7 @@ private fun CloseTopbarButton(
         modifier = Modifier.size(32.dp),
     ) {
         Icon(
-            painter = painterResource(R.drawable.ic_close),
+            painter = painterResource(R.drawable.ic_x_mark),
             contentDescription = "Close",
             modifier = Modifier.size(14.dp),
             tint = ClipyTheme.colors.neutral.gray600,

@@ -6,8 +6,8 @@ import com.laxotters.clipy.core.designsystem.R
 enum class ActionMenuIcon(
     @get:DrawableRes internal val resourceId: Int,
 ) {
-    Link(R.drawable.ic_action_menu_link),
-    Share(R.drawable.ic_action_menu_share),
-    Edit(R.drawable.ic_action_menu_edit),
-    Delete(R.drawable.ic_action_menu_delete),
+    Link(R.drawable.ic_link),
+    Share(R.drawable.ic_share),
+    Edit(R.drawable.ic_pencil),
+    Delete(R.drawable.ic_delete),
 }
