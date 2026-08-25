@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 internal object DialogDefaults {
     val maxWidth = 384.dp
     val screenHorizontalPadding = 20.dp
+    val screenVerticalPadding = 60.dp
     val contentPadding = 20.dp
     val contentSpacing = 24.dp
     val headingTopPadding = 12.dp

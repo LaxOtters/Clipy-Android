@@ -5,16 +5,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -34,6 +40,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -87,17 +95,15 @@ fun ClipySingleDialog(
     modifier: Modifier = Modifier,
     style: ClipyDialogStyle = ClipyDialogStyle.Default,
 ) {
-    ClipyDialogWindow {
-        ClipyDialogSurface(
-            modifier = modifier,
-        ) {
-            DialogContent(
-                title = title,
-                description = description,
-                primaryAction = primaryAction,
-                style = style,
-            )
-        }
+    ClipyDialogWindow(
+        modifier = modifier,
+    ) {
+        DialogContent(
+            title = title,
+            description = description,
+            primaryAction = primaryAction,
+            style = style,
+        )
     }
 }
 
@@ -111,68 +117,40 @@ fun ClipyDualDialog(
     modifier: Modifier = Modifier,
     style: ClipyDialogStyle = ClipyDialogStyle.Default,
 ) {
-    ClipyDialogWindow {
-        ClipyDialogSurface(
-            modifier = modifier,
-        ) {
-            DialogContent(
-                title = title,
-                description = description,
-                primaryAction = primaryAction,
-                secondaryAction = secondaryAction,
-                style = style,
-            )
-        }
+    ClipyDialogWindow(
+        modifier = modifier,
+    ) {
+        DialogContent(
+            title = title,
+            description = description,
+            primaryAction = primaryAction,
+            secondaryAction = secondaryAction,
+            style = style,
+        )
     }
 }
 
+/** 웹 콘텐츠가 요청한 alert, confirm, prompt를 네이티브 UI로 표시합니다. */
 @Composable
-private fun DialogContent(
-    title: String,
-    description: String,
-    primaryAction: ClipyTextAction,
-    secondaryAction: ClipyTextAction? = null,
-    style: ClipyDialogStyle = ClipyDialogStyle.Default,
+fun ClipyJsDialog(
+    source: String,
+    state: ClipyJsDialogState,
+    modifier: Modifier = Modifier,
 ) {
-    DialogTextContent(
-        title = title,
-        description = description,
-        modifier = if (style == ClipyDialogStyle.Error) {
-            Modifier
-        } else {
-            Modifier.padding(top = DialogDefaults.headingTopPadding)
-        },
-        showErrorIcon = style == ClipyDialogStyle.Error,
-    )
-    if (secondaryAction == null) {
-        ClipyButton(
-            text = primaryAction.label,
-            onClick = primaryAction.onClick,
-            modifier = Modifier.fillMaxWidth(),
+    ClipyDialogWindow(
+        modifier = modifier,
+    ) {
+        JsDialogContent(
+            source = source,
+            state = state,
         )
-    } else {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DialogDefaults.actionSpacing),
-        ) {
-            ClipyButton(
-                text = secondaryAction.label,
-                onClick = secondaryAction.onClick,
-                modifier = Modifier.weight(1f),
-                type = ButtonType.Secondary,
-            )
-            ClipyButton(
-                text = primaryAction.label,
-                onClick = primaryAction.onClick,
-                modifier = Modifier.weight(1f),
-            )
-        }
     }
 }
 
 @Composable
 internal fun ClipyDialogWindow(
-    content: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
         onDismissRequest = {},
@@ -181,7 +159,29 @@ internal fun ClipyDialogWindow(
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window
         val dimAmount = ClipyTheme.colors.overlayBackground.alpha
         SideEffect { window?.setDimAmount(dimAmount) }
-        content()
+        DialogLayout(
+            modifier = modifier,
+            content = content,
+        )
+    }
+}
+
+@Composable
+internal fun DialogLayout(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        val verticalPadding = DialogDefaults.screenVerticalPadding * 2
+        val maxDialogHeight = (maxHeight - verticalPadding).coerceAtLeast(0.dp)
+
+        ClipyDialogSurface(
+            modifier = modifier.heightIn(max = maxDialogHeight),
+            content = content,
+        )
     }
 }
 
@@ -211,6 +211,57 @@ internal fun ClipyDialogSurface(
 }
 
 @Composable
+private fun ColumnScope.DialogContent(
+    title: String,
+    description: String,
+    primaryAction: ClipyTextAction,
+    secondaryAction: ClipyTextAction? = null,
+    style: ClipyDialogStyle = ClipyDialogStyle.Default,
+) {
+    DialogTextContent(
+        title = title,
+        description = description,
+        modifier = Modifier
+            .weight(
+                weight = 1f,
+                fill = false,
+            )
+            .then(
+                if (style == ClipyDialogStyle.Error) {
+                    Modifier
+                } else {
+                    Modifier.padding(top = DialogDefaults.headingTopPadding)
+                },
+            ),
+        showErrorIcon = style == ClipyDialogStyle.Error,
+    )
+    if (secondaryAction == null) {
+        ClipyButton(
+            text = primaryAction.label,
+            onClick = primaryAction.onClick,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(DialogDefaults.actionSpacing),
+        ) {
+            ClipyButton(
+                text = secondaryAction.label,
+                onClick = secondaryAction.onClick,
+                modifier = Modifier.weight(1f),
+                type = ButtonType.Secondary,
+            )
+            ClipyButton(
+                text = primaryAction.label,
+                onClick = primaryAction.onClick,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
 internal fun DialogTextContent(
     title: String,
     description: String,
@@ -218,15 +269,9 @@ internal fun DialogTextContent(
     textAlign: TextAlign = TextAlign.Center,
     showErrorIcon: Boolean = false,
 ) {
+    val descriptionScrollState = rememberScrollState()
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(
-            if (showErrorIcon) {
-                DialogDefaults.errorIconSpacing
-            } else {
-                DialogDefaults.textSpacing
-            },
-        ),
         horizontalAlignment = if (textAlign == TextAlign.Start) {
             Alignment.Start
         } else {
@@ -239,90 +284,91 @@ internal fun DialogTextContent(
                 contentDescription = null,
                 modifier = Modifier.size(DialogDefaults.iconSize),
             )
+            Spacer(modifier = Modifier.height(DialogDefaults.errorIconSpacing))
         }
-        Column(
+        Text(
+            text = title,
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(DialogDefaults.textSpacing),
-        ) {
-            Text(
-                text = title,
-                modifier = Modifier.fillMaxWidth(),
-                color = ClipyTheme.colors.neutral.gray800,
-                style = ClipyTheme.typography.heading2,
-                textAlign = textAlign,
-            )
-            Text(
-                text = description,
-                modifier = Modifier.fillMaxWidth(),
-                color = ClipyTheme.colors.neutral.gray500,
-                style = ClipyTheme.typography.body1Regular,
-                textAlign = textAlign,
-            )
-        }
-    }
-}
-
-/** 웹 콘텐츠가 요청한 alert, confirm, prompt를 네이티브 UI로 표시합니다. */
-@Composable
-fun ClipyJsDialog(
-    source: String,
-    state: ClipyJsDialogState,
-    modifier: Modifier = Modifier,
-) {
-    ClipyDialogWindow {
-        JsDialogContent(
-            source = source,
-            state = state,
-            modifier = modifier,
+            color = ClipyTheme.colors.neutral.gray800,
+            style = ClipyTheme.typography.heading2,
+            textAlign = textAlign,
+        )
+        Spacer(modifier = Modifier.height(DialogDefaults.textSpacing))
+        Text(
+            text = description,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(
+                    weight = 1f,
+                    fill = false,
+                )
+                .verticalScroll(descriptionScrollState),
+            color = ClipyTheme.colors.neutral.gray500,
+            style = ClipyTheme.typography.body1Regular,
+            textAlign = textAlign,
         )
     }
 }
 
 @Composable
-private fun JsDialogContent(
+private fun ColumnScope.JsDialogContent(
     source: String,
     state: ClipyJsDialogState,
-    modifier: Modifier = Modifier,
 ) {
     val promptInitialValue = (state as? ClipyJsDialogState.Prompt)
         ?.initialValue
         .orEmpty()
-    var promptValue by rememberSaveable(promptInitialValue) {
+    var promptValue by rememberSaveable(
+        source,
+        state.title,
+        state.description,
+        promptInitialValue,
+    ) {
         mutableStateOf(promptInitialValue)
     }
 
-    ClipyDialogSurface(
-        modifier = modifier,
-    ) {
-        JsDialogBody(
-            source = source,
-            state = state,
-            promptValue = promptValue,
-            onPromptValueChange = { promptValue = it },
-        )
-        when (state) {
-            is ClipyJsDialogState.Alert -> {
-                JsDialogActions(
-                    primaryAction = state.confirmAction,
-                )
-            }
+    JsDialogBody(
+        source = source,
+        state = state,
+        promptValue = promptValue,
+        onPromptValueChange = { promptValue = it },
+        modifier = Modifier.weight(
+            weight = 1f,
+            fill = false,
+        ),
+    )
+    when (state) {
+        is ClipyJsDialogState.Alert -> {
+            JsDialogActions(
+                primaryAction = state.confirmAction,
+            )
+        }
 
-            is ClipyJsDialogState.Confirm -> {
-                JsDialogActions(
-                    primaryAction = state.confirmAction,
-                    secondaryAction = state.cancelAction,
-                )
-            }
+        is ClipyJsDialogState.Confirm -> {
+            JsDialogActions(
+                primaryAction = state.confirmAction,
+                secondaryAction = state.cancelAction,
+            )
+        }
 
-            is ClipyJsDialogState.Prompt -> {
-                JsDialogActions(
-                    primaryAction = ClipyTextAction(
-                        label = state.confirmAction.label,
-                        onClick = { state.confirmAction.onClick(promptValue) },
-                    ),
-                    secondaryAction = state.cancelAction,
-                )
-            }
+        is ClipyJsDialogState.Prompt -> {
+            JsDialogActions(
+                primaryAction = ClipyTextAction(
+                    label = state.confirmAction.label,
+                    onClick = {
+                        val confirmedValue = promptValue
+                        promptValue = promptInitialValue
+                        state.confirmAction.onClick(confirmedValue)
+                    },
+                ),
+                secondaryAction = ClipyTextAction(
+                    label = state.cancelAction.label,
+                    onClick = {
+                        promptValue = promptInitialValue
+                        state.cancelAction.onClick()
+                    },
+                ),
+            )
         }
     }
 }
@@ -333,11 +379,25 @@ private fun JsDialogBody(
     state: ClipyJsDialogState,
     promptValue: String,
     onPromptValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(JsDialogDefaults.bodySpacing),
     ) {
+        val messageModifier = Modifier
+            .weight(
+                weight = 1f,
+                fill = false,
+            )
+            .then(
+                if (state is ClipyJsDialogState.Alert) {
+                    Modifier
+                } else {
+                    Modifier.padding(top = DialogDefaults.headingTopPadding)
+                },
+            )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(JsDialogDefaults.sourceSpacing),
@@ -356,32 +416,21 @@ private fun JsDialogBody(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        when (state) {
-            is ClipyJsDialogState.Alert -> {
-                JsDialogMessage(
-                    title = state.title,
-                    description = state.description,
+        JsDialogMessage(
+            title = state.title,
+            description = state.description,
+            modifier = messageModifier,
+            textAlign = if (state is ClipyJsDialogState.Prompt) {
+                TextAlign.Start
+            } else {
+                TextAlign.Center
+            },
+        ) {
+            if (state is ClipyJsDialogState.Prompt) {
+                JsPromptInput(
+                    value = promptValue,
+                    onValueChange = onPromptValueChange,
                 )
-            }
-            is ClipyJsDialogState.Confirm -> {
-                JsDialogMessage(
-                    title = state.title,
-                    description = state.description,
-                    modifier = Modifier.padding(top = DialogDefaults.headingTopPadding),
-                )
-            }
-            is ClipyJsDialogState.Prompt -> {
-                JsDialogMessage(
-                    title = state.title,
-                    description = state.description,
-                    modifier = Modifier.padding(top = DialogDefaults.headingTopPadding),
-                    textAlign = TextAlign.Start,
-                ) {
-                    JsPromptInput(
-                        value = promptValue,
-                        onValueChange = onPromptValueChange,
-                    )
-                }
             }
         }
     }
@@ -395,6 +444,7 @@ private fun JsDialogMessage(
     textAlign: TextAlign = TextAlign.Center,
     promptInput: @Composable (ColumnScope.() -> Unit)? = null,
 ) {
+    val contentScrollState = rememberScrollState()
     val horizontalAlignment = if (textAlign == TextAlign.Start) {
         Alignment.Start
     } else {
@@ -404,7 +454,6 @@ private fun JsDialogMessage(
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = horizontalAlignment,
-        verticalArrangement = Arrangement.spacedBy(DialogDefaults.textSpacing),
     ) {
         Text(
             text = title,
@@ -413,14 +462,24 @@ private fun JsDialogMessage(
             style = ClipyTheme.typography.heading2,
             textAlign = textAlign,
         )
+        Spacer(modifier = Modifier.height(DialogDefaults.textSpacing))
         Text(
             text = description,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(
+                    weight = 1f,
+                    fill = false,
+                )
+                .verticalScroll(contentScrollState),
             color = ClipyTheme.colors.neutral.gray500,
             style = ClipyTheme.typography.body1Regular,
             textAlign = textAlign,
         )
-        promptInput?.invoke(this)
+        if (promptInput != null) {
+            Spacer(modifier = Modifier.height(DialogDefaults.textSpacing))
+            promptInput()
+        }
     }
 }
 
@@ -509,120 +568,141 @@ private val ClipyDialogProperties = DialogProperties(
     name = "Dialog · States",
     showBackground = true,
     widthDp = 390,
+    heightDp = 800,
 )
 @Composable
-private fun ClipyDialogsPreview() {
+private fun DialogStatesPreview(
+    @PreviewParameter(DialogPreviewProvider::class)
+    preview: DialogPreview,
+) {
     ClipyTheme {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            ClipyDialogSurface {
-                DialogContent(
-                    title = "연결할 수 없습니다",
-                    description = "잠시 후 다시 시도해주세요.",
-                    primaryAction = ClipyTextAction(
-                        label = "확인",
-                        onClick = {},
-                    ),
+        DialogLayout {
+            when (preview) {
+                is DialogPreview.App -> DialogContent(
+                    title = preview.title,
+                    description = preview.description,
+                    primaryAction = preview.primaryAction,
+                    secondaryAction = preview.secondaryAction,
+                    style = preview.style,
                 )
-            }
-            ClipyDialogSurface {
-                DialogContent(
-                    title = "항목을 삭제할까요?",
-                    description = "삭제한 항목은 되돌릴 수 없습니다.",
-                    primaryAction = ClipyTextAction(
-                        label = "삭제",
-                        onClick = {},
-                    ),
-                    secondaryAction = ClipyTextAction(
-                        label = "취소",
-                        onClick = {},
-                    ),
-                )
-            }
-            ClipyDialogSurface {
-                DialogContent(
-                    title = "연결할 수 없습니다",
-                    description = "잠시 후 다시 시도해주세요.",
-                    primaryAction = ClipyTextAction(
-                        label = "확인",
-                        onClick = {},
-                    ),
-                    style = ClipyDialogStyle.Error,
-                )
-            }
-            ClipyDialogSurface {
-                DialogContent(
-                    title = "항목을 삭제할 수 없습니다",
-                    description = "잠시 후 다시 시도하거나 취소해주세요.",
-                    primaryAction = ClipyTextAction(
-                        label = "재시도",
-                        onClick = {},
-                    ),
-                    secondaryAction = ClipyTextAction(
-                        label = "취소",
-                        onClick = {},
-                    ),
-                    style = ClipyDialogStyle.Error,
+
+                is DialogPreview.JavaScript -> JsDialogContent(
+                    source = "Request from example.com",
+                    state = preview.state,
                 )
             }
         }
     }
 }
 
-@Preview(
-    name = "Js Dialog · States",
-    showBackground = true,
-    widthDp = 390,
-)
-@Composable
-private fun JsDialogStatesPreview() {
-    ClipyTheme {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            JsDialogContent(
-                source = "Request from example.com",
-                state = ClipyJsDialogState.Alert(
-                    title = "알림",
-                    description = "웹사이트에서 메시지를 보냈습니다.",
-                    confirmAction = ClipyTextAction(
-                        label = "확인",
-                        onClick = {},
-                    ),
-                ),
-            )
-            JsDialogContent(
-                source = "Request from example.com",
-                state = ClipyJsDialogState.Confirm(
-                    title = "계속 진행할까요?",
-                    description = "웹사이트 요청을 확인해주세요.",
-                    confirmAction = ClipyTextAction(
-                        label = "확인",
-                        onClick = {},
-                    ),
-                    cancelAction = ClipyTextAction(
-                        label = "취소",
-                        onClick = {},
-                    ),
-                ),
-            )
-            JsDialogContent(
-                source = "Request from example.com",
-                state = ClipyJsDialogState.Prompt(
-                    title = "이름을 입력해주세요",
-                    description = "웹사이트에 전달할 값을 입력하세요.",
-                    confirmAction = ClipyTextInputAction(
-                        label = "확인",
-                        onClick = {},
-                    ),
-                    initialValue = "Clipy",
-                    cancelAction = ClipyTextAction(
-                        label = "취소",
-                        onClick = {},
-                    ),
-                ),
-            )
-        }
-    }
+private sealed interface DialogPreview {
+    data class App(
+        val title: String,
+        val description: String,
+        val primaryAction: ClipyTextAction,
+        val secondaryAction: ClipyTextAction? = null,
+        val style: ClipyDialogStyle = ClipyDialogStyle.Default,
+    ) : DialogPreview
+
+    data class JavaScript(
+        val state: ClipyJsDialogState,
+    ) : DialogPreview
 }
+
+private class DialogPreviewProvider : PreviewParameterProvider<DialogPreview> {
+    override val values = sequenceOf(
+        DialogPreview.App(
+            title = "연결할 수 없습니다",
+            description = "잠시 후 다시 시도해주세요.",
+            primaryAction = PreviewConfirmAction,
+        ),
+        DialogPreview.App(
+            title = "항목을 삭제할까요?",
+            description = "삭제한 항목은 되돌릴 수 없습니다.",
+            primaryAction = ClipyTextAction(
+                label = "삭제",
+                onClick = {},
+            ),
+            secondaryAction = PreviewCancelAction,
+        ),
+        DialogPreview.App(
+            title = "연결할 수 없습니다",
+            description = "잠시 후 다시 시도해주세요.",
+            primaryAction = PreviewConfirmAction,
+            style = ClipyDialogStyle.Error,
+        ),
+        DialogPreview.App(
+            title = "항목을 삭제할 수 없습니다",
+            description = "잠시 후 다시 시도하거나 취소해주세요.",
+            primaryAction = ClipyTextAction(
+                label = "재시도",
+                onClick = {},
+            ),
+            secondaryAction = PreviewCancelAction,
+            style = ClipyDialogStyle.Error,
+        ),
+        DialogPreview.App(
+            title = "이용 안내",
+            description = LongDialogDescription,
+            primaryAction = PreviewConfirmAction,
+        ),
+        DialogPreview.JavaScript(
+            state = ClipyJsDialogState.Alert(
+                title = "알림",
+                description = "웹사이트에서 메시지를 보냈습니다.",
+                confirmAction = PreviewConfirmAction,
+            ),
+        ),
+        DialogPreview.JavaScript(
+            state = ClipyJsDialogState.Confirm(
+                title = "계속 진행할까요?",
+                description = "웹사이트 요청을 확인해주세요.",
+                confirmAction = PreviewConfirmAction,
+                cancelAction = PreviewCancelAction,
+            ),
+        ),
+        DialogPreview.JavaScript(
+            state = ClipyJsDialogState.Prompt(
+                title = "이름을 입력해주세요",
+                description = "웹사이트에 전달할 값을 입력하세요.",
+                confirmAction = PreviewPromptConfirmAction,
+                initialValue = "Clipy",
+                cancelAction = PreviewCancelAction,
+            ),
+        ),
+        DialogPreview.JavaScript(
+            state = ClipyJsDialogState.Prompt(
+                title = "정보를 입력해주세요",
+                description = LongDialogDescription,
+                confirmAction = PreviewPromptConfirmAction,
+                initialValue = "Clipy",
+                cancelAction = PreviewCancelAction,
+            ),
+        ),
+    )
+}
+
+private val LongDialogDescription = (
+    """
+        긴 본문은 제목과 버튼의 위치를 유지한 채 본문 영역 안에서만 스크롤됩니다.
+        사용자는 내용을 위아래로 이동해 모두 확인할 수 있습니다.
+        화면 높이가 충분하면 별도의 스크롤 없이 내용 높이에 맞춰 표시됩니다.
+        화면 높이가 부족한 경우에도 확인과 취소 버튼은 항상 같은 위치에 남습니다.
+        입력창이 있는 경우에는 본문만 스크롤되고 입력창은 고정됩니다.
+    """.trimIndent() + "\n"
+    ).repeat(6)
+
+private val PreviewConfirmAction = ClipyTextAction(
+    label = "확인",
+    onClick = {},
+)
+
+private val PreviewCancelAction = ClipyTextAction(
+    label = "취소",
+    onClick = {},
+)
+
+private val PreviewPromptConfirmAction = ClipyTextInputAction(
+    label = "확인",
+    onClick = {},
+)

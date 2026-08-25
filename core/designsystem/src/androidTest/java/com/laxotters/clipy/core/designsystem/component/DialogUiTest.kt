@@ -1,11 +1,13 @@
 package com.laxotters.clipy.core.designsystem.component
 
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -277,6 +279,150 @@ class DialogUiTest {
         composeTestRule.runOnIdle {
             assertEquals(
                 "Updated",
+                confirmedValue,
+            )
+        }
+    }
+
+    @Test
+    fun jsPrompt_consecutiveRequestWithSameInitialValueResetsInput() {
+        var confirmedValue: String? = null
+        val requestCount = mutableIntStateOf(0)
+
+        composeTestRule.setContent {
+            val currentRequestCount = requestCount.intValue
+
+            ClipyTheme {
+                ClipyJsDialog(
+                    source = "Request from example.com",
+                    state = ClipyJsDialogState.Prompt(
+                        title = "Enter a name",
+                        description = "This value is sent to the website.",
+                        confirmAction = ClipyTextInputAction(
+                            label = "OK",
+                            onClick = {
+                                confirmedValue = it
+                                requestCount.intValue = currentRequestCount + 1
+                            },
+                        ),
+                        initialValue = "Clipy",
+                        cancelAction = ClipyTextAction(
+                            label = "Cancel",
+                            onClick = {},
+                        ),
+                    ),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Clipy").performTextReplacement("Updated")
+        composeTestRule.onNodeWithText("OK").performClick()
+
+        composeTestRule.runOnIdle {
+            assertEquals(
+                "Updated",
+                confirmedValue,
+            )
+        }
+        composeTestRule.onNodeWithText("Clipy").assertIsDisplayed()
+    }
+
+    @Test
+    fun jsPrompt_cancelThenConsecutiveRequestWithSameInitialValueResetsInput() {
+        val requestCount = mutableIntStateOf(0)
+
+        composeTestRule.setContent {
+            val currentRequestCount = requestCount.intValue
+
+            ClipyTheme {
+                ClipyJsDialog(
+                    source = "Request from example.com",
+                    state = ClipyJsDialogState.Prompt(
+                        title = "Enter a name",
+                        description = "This value is sent to the website.",
+                        confirmAction = ClipyTextInputAction(
+                            label = "OK",
+                            onClick = {},
+                        ),
+                        initialValue = "Clipy",
+                        cancelAction = ClipyTextAction(
+                            label = "Cancel",
+                            onClick = {
+                                requestCount.intValue = currentRequestCount + 1
+                            },
+                        ),
+                    ),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Clipy").performTextReplacement("Updated")
+        composeTestRule.onNodeWithText("Cancel").performClick()
+
+        composeTestRule.onNodeWithText("Clipy").assertIsDisplayed()
+    }
+
+    @Test
+    fun clipyDialog_longDescriptionScrollsAndKeepsActionVisible() {
+        var confirmCount = 0
+
+        composeTestRule.setContent {
+            ClipyTheme {
+                ClipySingleDialog(
+                    title = "Terms",
+                    description = "Long description\n".repeat(40),
+                    primaryAction = ClipyTextAction(
+                        label = "Confirm",
+                        onClick = { confirmCount++ },
+                    ),
+                )
+            }
+        }
+
+        composeTestRule.onNode(hasScrollAction()).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Confirm").assertIsDisplayed().performClick()
+
+        composeTestRule.runOnIdle {
+            assertEquals(
+                1,
+                confirmCount,
+            )
+        }
+    }
+
+    @Test
+    fun jsPrompt_longContentScrollsAndKeepsActionsVisible() {
+        var confirmedValue: String? = null
+
+        composeTestRule.setContent {
+            ClipyTheme {
+                ClipyJsDialog(
+                    source = "Request from example.com",
+                    state = ClipyJsDialogState.Prompt(
+                        title = "Enter a name",
+                        description = "Long description\n".repeat(40),
+                        confirmAction = ClipyTextInputAction(
+                            label = "OK",
+                            onClick = { confirmedValue = it },
+                        ),
+                        initialValue = "Clipy",
+                        cancelAction = ClipyTextAction(
+                            label = "Cancel",
+                            onClick = {},
+                        ),
+                    ),
+                )
+            }
+        }
+
+        composeTestRule.onNode(hasScrollAction()).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Clipy").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Cancel").assertIsDisplayed()
+        composeTestRule.onNodeWithText("OK").assertIsDisplayed().performClick()
+
+        composeTestRule.runOnIdle {
+            assertEquals(
+                "Clipy",
                 confirmedValue,
             )
         }
