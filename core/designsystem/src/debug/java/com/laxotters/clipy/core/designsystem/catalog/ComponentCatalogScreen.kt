@@ -90,11 +90,18 @@ fun ComponentCatalogScreen(modifier: Modifier = Modifier) {
 
 @Composable
 private fun ButtonSection() {
-    CatalogSection(title = "Button") {
+    CatalogSection(
+        title = "Button",
+    ) {
         ButtonType.entries.forEach { type ->
             CatalogStateLabel("${type.name} · Medium")
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                listOf(true, false).forEach { enabled ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                listOf(
+                    true,
+                    false,
+                ).forEach { enabled ->
                     ClipyButton(
                         text = if (enabled) "Enabled" else "Disabled",
                         onClick = {},
@@ -106,8 +113,13 @@ private fun ButtonSection() {
             }
         }
         CatalogStateLabel("Primary · Small")
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            listOf(true, false).forEach { enabled ->
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            listOf(
+                true,
+                false,
+            ).forEach { enabled ->
                 ClipyButton(
                     text = if (enabled) "Enabled" else "Disabled",
                     onClick = {},
@@ -121,9 +133,14 @@ private fun ButtonSection() {
 
 @Composable
 private fun FooterButtonSection() {
-    CatalogSection(title = "Footer Button") {
+    CatalogSection(
+        title = "Footer Button",
+    ) {
         FooterButtonType.entries.forEach { type ->
-            listOf(true, false).forEach { enabled ->
+            listOf(
+                true,
+                false,
+            ).forEach { enabled ->
                 CatalogStateLabel("${type.name} · ${if (enabled) "Enabled" else "Disabled"}")
                 ClipyFooterButton(
                     text = "Confirm",
@@ -138,14 +155,16 @@ private fun FooterButtonSection() {
 
 @Composable
 private fun DividerSection() {
-    CatalogSection(title = "Divider") {
+    CatalogSection(
+        title = "Divider",
+    ) {
         listOf(
             "Large · 40dp" to DividerDefaults.largeVerticalPadding,
             "Medium · 20dp" to DividerDefaults.mediumVerticalPadding,
             "Small · 10dp" to DividerDefaults.smallVerticalPadding,
-        ).forEach { (label, padding) ->
-            CatalogStateLabel(label)
-            ClipyDivider(verticalPadding = padding)
+        ).forEach { labeledPadding ->
+            CatalogStateLabel(labeledPadding.first)
+            ClipyDivider(verticalPadding = labeledPadding.second)
         }
     }
 }
@@ -158,7 +177,9 @@ private fun ActionMenuSection() {
         mutableStateOf(ActionMenuPlacement.BottomEnd)
     }
 
-    CatalogSection(title = "Action Menu") {
+    CatalogSection(
+        title = "Action Menu",
+    ) {
         CatalogStateLabel("Default · Destructive")
         Text(
             text = "Placement: ${selectedPlacement.name}\n" +
@@ -166,11 +187,15 @@ private fun ActionMenuSection() {
             color = ClipyTheme.colors.neutral.gray800,
             style = ClipyTheme.typography.body2Medium,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             ActionMenuPlacement.entries
                 .chunked(2)
                 .forEach { placements ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         placements.forEach { placement ->
                             ClipyButton(
                                 text = placement.name,
