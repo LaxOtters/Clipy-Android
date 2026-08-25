@@ -74,9 +74,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * [manager]에 등록된 요청을 상단 Snackbar로 표시합니다.
+ * [manager]에 등록된 요청을 앱 상단 Snackbar로 표시합니다.
  *
- * [modifier] 영역에서 Snackbar 바깥 터치를 감지하며 해당 터치는 소비하지 않습니다.
+ * [modifier]는 앱 UI 전체 영역을 차지해야 합니다.
+ * Snackbar 바깥을 터치하면 현재 Snackbar가 닫히며 같은 터치는 아래 화면에도 전달됩니다.
  */
 @Composable
 fun ClipySnackbarHost(
@@ -498,7 +499,7 @@ private fun SnackbarPreviewSurface(
     }
 }
 
-/** Snackbar 바깥 터치를 감지하되 화면의 기존 터치 동작은 유지합니다. */
+/** Snackbar 바깥 터치를 감지하며 아래 화면의 클릭 동작을 막지 않습니다. */
 private fun Modifier.detectSnackbarOutsideTap(
     onPointerDown: (Offset) -> Unit,
 ): Modifier = this then SnackbarOutsideTapElement(onPointerDown)

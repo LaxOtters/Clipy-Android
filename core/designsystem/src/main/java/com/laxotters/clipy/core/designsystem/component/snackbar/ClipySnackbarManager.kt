@@ -49,7 +49,7 @@ internal suspend fun SnackbarHostState.showClipySnackbar(
     ),
 )
 
-/** Route 수명 동안 Snackbar 요청의 FIFO 대기열과 중복 제거를 관리합니다. */
+/** 앱 UI 수명 동안 Snackbar 요청의 FIFO 대기열과 중복 제거를 관리합니다. */
 @Stable
 class ClipySnackbarManager internal constructor(
     internal val hostState: SnackbarHostState,
@@ -109,7 +109,7 @@ class ClipySnackbarManager internal constructor(
     }
 }
 
-/** Composition 수명에 맞춰 Snackbar Manager와 요청 대기열을 생성하고 해제합니다. */
+/** 현재 Composition 수명에 맞춰 Snackbar Manager와 요청 대기열을 생성합니다. */
 @Composable
 fun rememberClipySnackbarManager(): ClipySnackbarManager {
     val parentScope = rememberCoroutineScope()
