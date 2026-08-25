@@ -42,30 +42,49 @@ import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialog
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogState
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipySingleDialog
 import com.laxotters.clipy.core.designsystem.component.error.ClipyErrorOverlay
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarHost
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarIcon
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarManager
+import com.laxotters.clipy.core.designsystem.component.snackbar.rememberClipySnackbarManager
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 
 @Composable
 fun ComponentCatalogScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(ClipyTheme.colors.neutral.gray50)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(32.dp),
+    val snackbarManager = rememberClipySnackbarManager()
+
+    Box(
+        modifier = modifier.fillMaxSize(),
     ) {
-        Text(
-            text = "Clipy Component Catalog",
-            color = ClipyTheme.colors.neutral.gray950,
-            style = ClipyTheme.typography.heading1,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(ClipyTheme.colors.neutral.gray50)
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    horizontal = 20.dp,
+                    vertical = 24.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
+        ) {
+            Text(
+                text = "Clipy Component Catalog",
+                color = ClipyTheme.colors.neutral.gray950,
+                style = ClipyTheme.typography.heading1,
+            )
+            ButtonSection()
+            FooterButtonSection()
+            DividerSection()
+            ActionMenuSection()
+            DialogSection()
+            ErrorOverlaySection()
+            SnackbarSection(manager = snackbarManager)
+            Spacer(Modifier.height(24.dp))
+        }
+
+        ClipySnackbarHost(
+            manager = snackbarManager,
+            modifier = Modifier.fillMaxSize(),
         )
-        ButtonSection()
-        FooterButtonSection()
-        DividerSection()
-        ActionMenuSection()
-        DialogSection()
-        ErrorOverlaySection()
-        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -373,6 +392,121 @@ private fun DialogSection() {
         )
 
         null -> Unit
+    }
+}
+
+@Composable
+private fun SnackbarSection(manager: ClipySnackbarManager) {
+    CatalogSection(
+        title = "Snackbar",
+    ) {
+        CatalogStateLabel("Message only · 2 seconds")
+        ClipyButton(
+            text = "Show message",
+            onClick = {
+                manager.showSnackbar(message = "항목을 저장했습니다.")
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Message with action · 2 seconds")
+        ClipyButton(
+            text = "Show action",
+            onClick = {
+                manager.showSnackbar(
+                    message = "네트워크에 연결할 수 없습니다.",
+                    action = ClipyTextAction(
+                        label = "재시도",
+                        onClick = {},
+                    ),
+                )
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Two-line message with action · Inline")
+        ClipyButton(
+            text = "Show two-line action",
+            onClick = {
+                manager.showSnackbar(
+                    message = "작업을 완료하지 못했습니다.\n잠시 후 다시 시도해주세요.",
+                    action = ClipyTextAction(
+                        label = "재시도",
+                        onClick = {},
+                    ),
+                )
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Long text and action · Stacked")
+        ClipyButton(
+            text = "Show stacked action",
+            onClick = {
+                manager.showSnackbar(
+                    message = "Long text Snackbar Example",
+                    action = ClipyTextAction(
+                        label = "Long Action Example",
+                        onClick = {},
+                    ),
+                )
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Long two-line text and action · Stacked")
+        ClipyButton(
+            text = "Show stacked two lines",
+            onClick = {
+                manager.showSnackbar(
+                    message = "Long text Snackbar Example\nLong text Snackbar Example",
+                    action = ClipyTextAction(
+                        label = "Long Action Example",
+                        onClick = {},
+                    ),
+                )
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Error icon")
+        ClipyButton(
+            text = "Show error",
+            onClick = {
+                manager.showSnackbar(
+                    message = "Something went wrong",
+                    icon = ClipySnackbarIcon.Error,
+                )
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Success icon · One line")
+        ClipyButton(
+            text = "Show success",
+            onClick = {
+                manager.showSnackbar(
+                    message = "Item Saved",
+                    icon = ClipySnackbarIcon.Success,
+                )
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Success icon · Two lines")
+        ClipyButton(
+            text = "Show success two lines",
+            onClick = {
+                manager.showSnackbar(
+                    message = "Item Saved\nYou can continue browsing.",
+                    icon = ClipySnackbarIcon.Success,
+                )
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Two-line message")
+        ClipyButton(
+            text = "Show two lines",
+            onClick = {
+                manager.showSnackbar(
+                    message = "콘텐츠를 불러오지 못했습니다.\n잠시 후 다시 시도해주세요.",
+                )
+            },
+            size = ButtonSize.Small,
+        )
     }
 }
 
