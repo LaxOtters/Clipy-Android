@@ -29,7 +29,11 @@ private val ErrorOverlaySpacing = 30.dp
 private val ErrorTextSpacing = 10.dp
 private val ErrorIconSize = 70.dp
 
-/** WebView 위에 오류 내용과 선택적 action을 표시하는 화면입니다. */
+/**
+ * WebView 위에 오류 내용과 선택적 action을 표시합니다.
+ *
+ * 스크롤 상태는 표시 중에만 유지되며, 오류 화면의 표시와 제거는 호출 화면이 관리합니다.
+ */
 @Composable
 fun ClipyErrorOverlay(
     title: String,
@@ -37,11 +41,13 @@ fun ClipyErrorOverlay(
     modifier: Modifier = Modifier,
     action: ClipyTextAction? = null,
 ) {
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(ClipyTheme.colors.primary.indigo50)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = ErrorOverlayHorizontalPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

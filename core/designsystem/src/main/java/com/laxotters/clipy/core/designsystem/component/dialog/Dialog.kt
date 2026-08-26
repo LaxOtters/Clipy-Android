@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -130,7 +128,11 @@ fun ClipyDualDialog(
     }
 }
 
-/** 웹 콘텐츠가 요청한 alert, confirm, prompt를 네이티브 UI로 표시합니다. */
+/**
+ * 웹 콘텐츠가 요청한 단일 JavaScript Dialog를 표시합니다.
+ *
+ * 요청의 수락, 교체와 표시 수명은 호출 계층이 관리합니다.
+ */
 @Composable
 fun ClipyJsDialog(
     source: String,
@@ -171,39 +173,26 @@ internal fun DialogLayout(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    BoxWithConstraints(
-        modifier = Modifier.fillMaxSize(),
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(
+                horizontal = DialogDefaults.screenHorizontalPadding,
+                vertical = DialogDefaults.screenVerticalPadding,
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        val verticalPadding = DialogDefaults.screenVerticalPadding * 2
-        val maxDialogHeight = (maxHeight - verticalPadding).coerceAtLeast(0.dp)
-
-        ClipyDialogSurface(
-            modifier = modifier.heightIn(max = maxDialogHeight),
-            content = content,
-        )
-    }
-}
-
-@Composable
-internal fun ClipyDialogSurface(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Box(
-        modifier = modifier
-            .padding(horizontal = DialogDefaults.screenHorizontalPadding)
-            .widthIn(max = DialogDefaults.maxWidth)
-            .fillMaxWidth()
-            .dropShadow(
-                shape = DialogDefaults.shape,
-                shadow = DialogDefaults.shadow,
-            )
-            .clip(DialogDefaults.shape)
-            .background(ClipyTheme.colors.primary.indigo50),
-    ) {
         Column(
-            modifier = Modifier.padding(DialogDefaults.contentPadding),
+            modifier = modifier
+                .widthIn(max = DialogDefaults.maxWidth)
+                .fillMaxWidth()
+                .dropShadow(
+                    shape = DialogDefaults.shape,
+                    shadow = DialogDefaults.shadow,
+                )
+                .clip(DialogDefaults.shape)
+                .background(ClipyTheme.colors.primary.indigo50)
+                .padding(DialogDefaults.contentPadding),
             verticalArrangement = Arrangement.spacedBy(DialogDefaults.contentSpacing),
             content = content,
         )
@@ -235,6 +224,17 @@ private fun ColumnScope.DialogContent(
             ),
         showErrorIcon = style == ClipyDialogStyle.Error,
     )
+    DialogActions(
+        primaryAction = primaryAction,
+        secondaryAction = secondaryAction,
+    )
+}
+
+@Composable
+private fun DialogActions(
+    primaryAction: ClipyTextAction,
+    secondaryAction: ClipyTextAction?,
+) {
     if (secondaryAction == null) {
         ClipyButton(
             text = primaryAction.label,
@@ -270,6 +270,7 @@ internal fun DialogTextContent(
     showErrorIcon: Boolean = false,
 ) {
     val descriptionScrollState = rememberScrollState()
+
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = if (textAlign == TextAlign.Start) {
@@ -337,40 +338,10 @@ private fun ColumnScope.JsDialogContent(
             fill = false,
         ),
     )
-    when (state) {
-        is ClipyJsDialogState.Alert -> {
-            JsDialogActions(
-                primaryAction = state.confirmAction,
-            )
-        }
-
-        is ClipyJsDialogState.Confirm -> {
-            JsDialogActions(
-                primaryAction = state.confirmAction,
-                secondaryAction = state.cancelAction,
-            )
-        }
-
-        is ClipyJsDialogState.Prompt -> {
-            JsDialogActions(
-                primaryAction = ClipyTextAction(
-                    label = state.confirmAction.label,
-                    onClick = {
-                        val confirmedValue = promptValue
-                        promptValue = promptInitialValue
-                        state.confirmAction.onClick(confirmedValue)
-                    },
-                ),
-                secondaryAction = ClipyTextAction(
-                    label = state.cancelAction.label,
-                    onClick = {
-                        promptValue = promptInitialValue
-                        state.cancelAction.onClick()
-                    },
-                ),
-            )
-        }
-    }
+    JsDialogActions(
+        state = state,
+        promptValue = promptValue,
+    )
 }
 
 @Composable
@@ -383,7 +354,6 @@ private fun JsDialogBody(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(JsDialogDefaults.bodySpacing),
     ) {
         val messageModifier = Modifier
             .weight(
@@ -416,6 +386,7 @@ private fun JsDialogBody(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        Spacer(modifier = Modifier.height(JsDialogDefaults.bodySpacing))
         JsDialogMessage(
             title = state.title,
             description = state.description,
@@ -425,13 +396,13 @@ private fun JsDialogBody(
             } else {
                 TextAlign.Center
             },
-        ) {
-            if (state is ClipyJsDialogState.Prompt) {
-                JsPromptInput(
-                    value = promptValue,
-                    onValueChange = onPromptValueChange,
-                )
-            }
+        )
+        if (state is ClipyJsDialogState.Prompt) {
+            Spacer(modifier = Modifier.height(DialogDefaults.textSpacing))
+            JsPromptInput(
+                value = promptValue,
+                onValueChange = onPromptValueChange,
+            )
         }
     }
 }
@@ -442,7 +413,6 @@ private fun JsDialogMessage(
     description: String,
     modifier: Modifier = Modifier,
     textAlign: TextAlign = TextAlign.Center,
-    promptInput: @Composable (ColumnScope.() -> Unit)? = null,
 ) {
     val contentScrollState = rememberScrollState()
     val horizontalAlignment = if (textAlign == TextAlign.Start) {
@@ -476,10 +446,6 @@ private fun JsDialogMessage(
             style = ClipyTheme.typography.body1Regular,
             textAlign = textAlign,
         )
-        if (promptInput != null) {
-            Spacer(modifier = Modifier.height(DialogDefaults.textSpacing))
-            promptInput()
-        }
     }
 }
 
@@ -521,9 +487,23 @@ private fun JsPromptInput(
 
 @Composable
 private fun JsDialogActions(
-    primaryAction: ClipyTextAction,
-    secondaryAction: ClipyTextAction? = null,
+    state: ClipyJsDialogState,
+    promptValue: String,
 ) {
+    val (primaryLabel, onPrimaryClick) = when (state) {
+        is ClipyJsDialogState.Alert -> state.confirmAction.label to state.confirmAction.onClick
+        is ClipyJsDialogState.Confirm -> state.confirmAction.label to state.confirmAction.onClick
+        is ClipyJsDialogState.Prompt -> {
+            state.confirmAction.label to {
+                state.confirmAction.onClick(promptValue)
+            }
+        }
+    }
+    val secondaryAction = when (state) {
+        is ClipyJsDialogState.Alert -> null
+        is ClipyJsDialogState.Confirm -> state.cancelAction
+        is ClipyJsDialogState.Prompt -> state.cancelAction
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(DialogDefaults.actionSpacing),
@@ -537,7 +517,7 @@ private fun JsDialogActions(
             )
         }
         Button(
-            onClick = primaryAction.onClick,
+            onClick = onPrimaryClick,
             modifier = Modifier
                 .weight(1f)
                 .height(JsDialogDefaults.actionHeight),
@@ -549,7 +529,7 @@ private fun JsDialogActions(
             contentPadding = PaddingValues(horizontal = DialogDefaults.contentPadding),
         ) {
             Text(
-                text = primaryAction.label,
+                text = primaryLabel,
                 style = ClipyTheme.typography.body1Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

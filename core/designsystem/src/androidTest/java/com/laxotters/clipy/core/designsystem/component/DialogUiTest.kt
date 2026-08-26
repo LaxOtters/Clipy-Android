@@ -1,6 +1,6 @@
 package com.laxotters.clipy.core.designsystem.component
 
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import androidx.test.espresso.Espresso.pressBackUnconditionally
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.laxotters.clipy.core.designsystem.component.ClipyTextInputAction
@@ -285,84 +286,6 @@ class DialogUiTest {
     }
 
     @Test
-    fun jsPrompt_consecutiveRequestWithSameInitialValueResetsInput() {
-        var confirmedValue: String? = null
-        val requestCount = mutableIntStateOf(0)
-
-        composeTestRule.setContent {
-            val currentRequestCount = requestCount.intValue
-
-            ClipyTheme {
-                ClipyJsDialog(
-                    source = "Request from example.com",
-                    state = ClipyJsDialogState.Prompt(
-                        title = "Enter a name",
-                        description = "This value is sent to the website.",
-                        confirmAction = ClipyTextInputAction(
-                            label = "OK",
-                            onClick = {
-                                confirmedValue = it
-                                requestCount.intValue = currentRequestCount + 1
-                            },
-                        ),
-                        initialValue = "Clipy",
-                        cancelAction = ClipyTextAction(
-                            label = "Cancel",
-                            onClick = {},
-                        ),
-                    ),
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithText("Clipy").performTextReplacement("Updated")
-        composeTestRule.onNodeWithText("OK").performClick()
-
-        composeTestRule.runOnIdle {
-            assertEquals(
-                "Updated",
-                confirmedValue,
-            )
-        }
-        composeTestRule.onNodeWithText("Clipy").assertIsDisplayed()
-    }
-
-    @Test
-    fun jsPrompt_cancelThenConsecutiveRequestWithSameInitialValueResetsInput() {
-        val requestCount = mutableIntStateOf(0)
-
-        composeTestRule.setContent {
-            val currentRequestCount = requestCount.intValue
-
-            ClipyTheme {
-                ClipyJsDialog(
-                    source = "Request from example.com",
-                    state = ClipyJsDialogState.Prompt(
-                        title = "Enter a name",
-                        description = "This value is sent to the website.",
-                        confirmAction = ClipyTextInputAction(
-                            label = "OK",
-                            onClick = {},
-                        ),
-                        initialValue = "Clipy",
-                        cancelAction = ClipyTextAction(
-                            label = "Cancel",
-                            onClick = {
-                                requestCount.intValue = currentRequestCount + 1
-                            },
-                        ),
-                    ),
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithText("Clipy").performTextReplacement("Updated")
-        composeTestRule.onNodeWithText("Cancel").performClick()
-
-        composeTestRule.onNodeWithText("Clipy").assertIsDisplayed()
-    }
-
-    @Test
     fun clipyDialog_longDescriptionScrollsAndKeepsActionVisible() {
         var confirmCount = 0
 
@@ -411,6 +334,7 @@ class DialogUiTest {
                             onClick = {},
                         ),
                     ),
+                    modifier = Modifier.height(320.dp),
                 )
             }
         }
