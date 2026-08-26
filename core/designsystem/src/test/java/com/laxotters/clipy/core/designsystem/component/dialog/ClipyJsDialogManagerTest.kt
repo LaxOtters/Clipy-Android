@@ -71,21 +71,34 @@ class ClipyJsDialogManagerTest {
     }
 
     @Test
-    fun staleRequestEntry_cannotCompleteNewRequest() {
+    fun sameRequest_isWrappedInNewEntryForEachAcceptedShow() {
         val manager = ClipyJsDialogManager()
-        val staleRequest = alertRequest(title = "First")
-        manager.show(staleRequest)
+        val request = alertRequest()
+
+        manager.show(request)
+        val firstRequestEntry = requireNotNull(manager.activeRequestEntry)
+        manager.complete(firstRequestEntry) {}
+        manager.show(request)
+        val secondRequestEntry = requireNotNull(manager.activeRequestEntry)
+
+        assertTrue(firstRequestEntry !== secondRequestEntry)
+        assertSame(request, secondRequestEntry.request)
+    }
+
+    @Test
+    fun staleRequestEntry_cannotCompleteReusedRequestEntry() {
+        val manager = ClipyJsDialogManager()
+        val request = alertRequest(title = "Same request")
+        manager.show(request)
         val staleRequestEntry = requireNotNull(manager.activeRequestEntry)
         manager.complete(staleRequestEntry) {}
 
-        val activeRequest = alertRequest(title = "Second")
-        manager.show(activeRequest)
+        manager.show(request)
         val activeRequestEntry = requireNotNull(manager.activeRequestEntry)
         var staleActionCount = 0
         manager.complete(staleRequestEntry) { staleActionCount++ }
 
         assertEquals(0, staleActionCount)
-        assertSame(activeRequest, activeRequestEntry.request)
         assertSame(activeRequestEntry, manager.activeRequestEntry)
     }
 

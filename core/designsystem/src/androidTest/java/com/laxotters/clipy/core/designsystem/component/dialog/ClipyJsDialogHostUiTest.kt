@@ -1,6 +1,7 @@
 package com.laxotters.clipy.core.designsystem.component.dialog
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -11,6 +12,7 @@ import com.laxotters.clipy.core.designsystem.component.ClipyTextAction
 import com.laxotters.clipy.core.designsystem.component.ClipyTextInputAction
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -61,5 +63,42 @@ class ClipyJsDialogHostUiTest {
                 .fetchSemanticsNodes()
                 .isEmpty()
         }
+    }
+
+    @Test
+    fun reusedPromptRequest_startsWithInitialValue() {
+        lateinit var manager: ClipyJsDialogManager
+        val request = ClipyJsDialogRequest.Prompt(
+            source = "Request from example.com",
+            title = "Enter a name",
+            description = "This value is sent to the website.",
+            initialValue = "Clipy",
+            confirmAction = ClipyTextInputAction(
+                label = "Confirm",
+                onClick = {},
+            ),
+            cancelAction = ClipyTextAction(
+                label = "Cancel",
+                onClick = {},
+            ),
+        )
+
+        composeTestRule.setContent {
+            ClipyTheme {
+                manager = rememberClipyJsDialogManager()
+                LaunchedEffect(Unit) {
+                    manager.show(request)
+                }
+                ClipyJsDialogHost(manager = manager)
+            }
+        }
+
+        composeTestRule.onNodeWithText("Clipy").performTextReplacement("Updated")
+        composeTestRule.onNodeWithText("Cancel").performClick()
+        composeTestRule.runOnIdle {
+            assertTrue(manager.show(request))
+        }
+
+        composeTestRule.onNodeWithText("Clipy").assertIsDisplayed()
     }
 }
