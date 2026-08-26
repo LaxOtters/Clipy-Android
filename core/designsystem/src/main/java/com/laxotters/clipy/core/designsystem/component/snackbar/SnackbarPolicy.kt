@@ -9,13 +9,13 @@ internal enum class SnackbarActionLayout {
     Stacked,
 }
 
-/** 현재 Snackbar의 영역과 바깥 터치 dismiss 가능 상태를 보관합니다. */
+/** 현재 Snackbar의 화면 영역과 바깥 터치 dismiss 상태를 보관합니다. */
 internal data class SnackbarOutsideTapState(
     val target: SnackbarData? = null,
     val bounds: Rect? = null,
     val canDismiss: Boolean = false,
 ) {
-    /** 현재 표시 중인 Snackbar의 바깥 터치 판정 영역을 갱신합니다. */
+    /** 현재 표시 중인 Snackbar의 화면 영역을 바깥 터치 판정 대상으로 갱신합니다. */
     fun updateBounds(
         activeSnackbarData: SnackbarData?,
         snackbarData: SnackbarData,
@@ -39,7 +39,7 @@ internal data class SnackbarOutsideTapState(
         }
     }
 
-    /** 현재 표시 중인 Snackbar의 바깥 터치 dismiss를 활성화합니다. */
+    /** Snackbar가 표시된 뒤 바깥 터치 dismiss를 허용합니다. */
     fun enableDismiss(
         activeSnackbarData: SnackbarData?,
         snackbarData: SnackbarData,
@@ -62,7 +62,7 @@ internal data class SnackbarOutsideTapState(
         }
     }
 
-    /** 종료된 Snackbar가 현재 판정 대상일 때 상태를 초기화합니다. */
+    /** 종료된 Snackbar가 현재 대상이면 바깥 터치 판정 상태를 비웁니다. */
     fun clearIfMatches(snackbarData: SnackbarData): SnackbarOutsideTapState =
         if (target === snackbarData) {
             SnackbarOutsideTapState()
@@ -70,7 +70,7 @@ internal data class SnackbarOutsideTapState(
             this
         }
 
-    /** 현재 Snackbar가 바깥 터치로 닫혀야 하는지 판단합니다. */
+    /** 현재 Snackbar의 영역 밖을 눌렀고 dismiss가 허용됐는지 판단합니다. */
     fun shouldDismiss(
         currentSnackbarData: SnackbarData?,
         tapPosition: Offset,
@@ -87,7 +87,7 @@ internal object SnackbarPolicy {
     const val DISPLAY_DURATION_MILLIS = 2_000L
     const val BACKDROP_CAPTURE_TIMEOUT_MILLIS = 150L
 
-    /** 메시지와 action의 합산 폭으로 action 배치를 결정합니다. */
+    /** 메시지와 action의 합산 폭이 가용 폭을 넘으면 action을 다음 줄에 배치합니다. */
     fun resolveActionLayout(
         messageWidth: Int,
         actionWidth: Int,
@@ -101,7 +101,7 @@ internal object SnackbarPolicy {
         SnackbarActionLayout.Inline
     }
 
-    /** 터치 위치가 Snackbar 영역 밖인지 판단합니다. */
+    /** Snackbar 영역을 아직 알 수 없으면 바깥 터치로 처리하지 않습니다. */
     fun isOutsideSnackbar(
         snackbarBounds: Rect?,
         tapPosition: Offset,

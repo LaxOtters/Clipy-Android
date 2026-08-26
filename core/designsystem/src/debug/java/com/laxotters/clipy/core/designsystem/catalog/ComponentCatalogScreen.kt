@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,19 +43,20 @@ import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialog
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogState
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipySingleDialog
 import com.laxotters.clipy.core.designsystem.component.error.ClipyErrorOverlay
-import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarHost
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarController
 import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarIcon
-import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarManager
-import com.laxotters.clipy.core.designsystem.component.snackbar.rememberClipySnackbarManager
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarLayout
+import com.laxotters.clipy.core.designsystem.component.snackbar.rememberClipySnackbarController
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
+import kotlinx.coroutines.launch
 
 @Composable
 fun ComponentCatalogScreen(modifier: Modifier = Modifier) {
-    val snackbarManager = rememberClipySnackbarManager()
-
-    Box(
+    ClipySnackbarLayout(
         modifier = modifier.fillMaxSize(),
     ) {
+        val snackbar = rememberClipySnackbarController()
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -77,14 +79,9 @@ fun ComponentCatalogScreen(modifier: Modifier = Modifier) {
             ActionMenuSection()
             DialogSection()
             ErrorOverlaySection()
-            SnackbarSection(manager = snackbarManager)
+            SnackbarSection(snackbar = snackbar)
             Spacer(Modifier.height(24.dp))
         }
-
-        ClipySnackbarHost(
-            manager = snackbarManager,
-            modifier = Modifier.fillMaxSize(),
-        )
     }
 }
 
@@ -421,7 +418,9 @@ private fun DialogSection() {
 }
 
 @Composable
-private fun SnackbarSection(manager: ClipySnackbarManager) {
+private fun SnackbarSection(snackbar: ClipySnackbarController) {
+    val coroutineScope = rememberCoroutineScope()
+
     CatalogSection(
         title = "Snackbar",
     ) {
@@ -429,7 +428,9 @@ private fun SnackbarSection(manager: ClipySnackbarManager) {
         ClipyButton(
             text = "Show message",
             onClick = {
-                manager.showSnackbar(message = "항목을 저장했습니다.")
+                coroutineScope.launch {
+                    snackbar.showSnackbar(message = "항목을 저장했습니다.")
+                }
             },
             size = ButtonSize.Small,
         )
@@ -437,13 +438,15 @@ private fun SnackbarSection(manager: ClipySnackbarManager) {
         ClipyButton(
             text = "Show action",
             onClick = {
-                manager.showSnackbar(
-                    message = "네트워크에 연결할 수 없습니다.",
-                    action = ClipyTextAction(
-                        label = "재시도",
-                        onClick = {},
-                    ),
-                )
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "네트워크에 연결할 수 없습니다.",
+                        action = ClipyTextAction(
+                            label = "재시도",
+                            onClick = {},
+                        ),
+                    )
+                }
             },
             size = ButtonSize.Small,
         )
@@ -451,13 +454,15 @@ private fun SnackbarSection(manager: ClipySnackbarManager) {
         ClipyButton(
             text = "Show stacked action",
             onClick = {
-                manager.showSnackbar(
-                    message = "Long text Snackbar Example",
-                    action = ClipyTextAction(
-                        label = "Long Action Example",
-                        onClick = {},
-                    ),
-                )
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "Long text Snackbar Example",
+                        action = ClipyTextAction(
+                            label = "Long Action Example",
+                            onClick = {},
+                        ),
+                    )
+                }
             },
             size = ButtonSize.Small,
         )
@@ -465,13 +470,15 @@ private fun SnackbarSection(manager: ClipySnackbarManager) {
         ClipyButton(
             text = "Show stacked two lines",
             onClick = {
-                manager.showSnackbar(
-                    message = "Long text Snackbar Example\nLong text Snackbar Example",
-                    action = ClipyTextAction(
-                        label = "Long Action Example",
-                        onClick = {},
-                    ),
-                )
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "Long text Snackbar Example\nLong text Snackbar Example",
+                        action = ClipyTextAction(
+                            label = "Long Action Example",
+                            onClick = {},
+                        ),
+                    )
+                }
             },
             size = ButtonSize.Small,
         )
@@ -479,10 +486,12 @@ private fun SnackbarSection(manager: ClipySnackbarManager) {
         ClipyButton(
             text = "Show error",
             onClick = {
-                manager.showSnackbar(
-                    message = "Something went wrong",
-                    icon = ClipySnackbarIcon.Error,
-                )
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "Something went wrong",
+                        icon = ClipySnackbarIcon.Error,
+                    )
+                }
             },
             size = ButtonSize.Small,
         )
@@ -490,10 +499,12 @@ private fun SnackbarSection(manager: ClipySnackbarManager) {
         ClipyButton(
             text = "Show success",
             onClick = {
-                manager.showSnackbar(
-                    message = "Item Saved",
-                    icon = ClipySnackbarIcon.Success,
-                )
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "Item Saved",
+                        icon = ClipySnackbarIcon.Success,
+                    )
+                }
             },
             size = ButtonSize.Small,
         )
@@ -501,10 +512,12 @@ private fun SnackbarSection(manager: ClipySnackbarManager) {
         ClipyButton(
             text = "Show success two lines",
             onClick = {
-                manager.showSnackbar(
-                    message = "Item Saved\nYou can continue browsing.",
-                    icon = ClipySnackbarIcon.Success,
-                )
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "Item Saved\nYou can continue browsing.",
+                        icon = ClipySnackbarIcon.Success,
+                    )
+                }
             },
             size = ButtonSize.Small,
         )
@@ -512,9 +525,11 @@ private fun SnackbarSection(manager: ClipySnackbarManager) {
         ClipyButton(
             text = "Show two lines",
             onClick = {
-                manager.showSnackbar(
-                    message = "콘텐츠를 불러오지 못했습니다.\n잠시 후 다시 시도해주세요.",
-                )
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "콘텐츠를 불러오지 못했습니다.\n잠시 후 다시 시도해주세요.",
+                    )
+                }
             },
             size = ButtonSize.Small,
         )

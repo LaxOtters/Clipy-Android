@@ -8,14 +8,8 @@ import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
 import com.laxotters.clipy.core.designsystem.component.ClipyTextAction
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 enum class ClipySnackbarIcon {
     Success,
@@ -49,19 +43,14 @@ internal suspend fun SnackbarHostState.showClipySnackbar(
     ),
 )
 
-/** 앱 UI 수명 동안 Snackbar 요청의 FIFO 대기열과 중복 제거를 관리합니다. */
+/** 화면에서 Snackbar를 요청하기 위한 공개 API입니다. */
 @Stable
-class ClipySnackbarManager internal constructor(
-    internal val hostState: SnackbarHostState,
-    parentScope: CoroutineScope,
+class ClipySnackbarController internal constructor(
+    private val manager: ClipySnackbarManager,
 ) {
-    private val managerJob = SupervisorJob(parentScope.coroutineContext[Job])
-    private val scope = CoroutineScope(parentScope.coroutineContext + managerJob)
-    private val registeredKeys = mutableSetOf<String>()
-
-    /** Snackbar 요청을 대기열에 등록합니다. */
+    /** 현재 coroutine이 취소될 때까지 Snackbar 표시 완료를 기다립니다. */
     @MainThread
-    fun showSnackbar(
+    suspend fun showSnackbar(
         message: String,
         icon: ClipySnackbarIcon? = null,
         action: ClipyTextAction? = null,
@@ -71,58 +60,68 @@ class ClipySnackbarManager internal constructor(
             "Clipy Snackbar does not support action and icon together."
         }
 
-        enqueue(
+        manager.showSnackbar(
             key = key,
-            show = {
-                hostState.showClipySnackbar(
-                    message = message,
-                    actionLabel = action?.label,
-                    icon = icon,
-                )
-            },
-            onAction = action?.onClick,
+            message = message,
+            icon = icon,
+            action = action,
         )
     }
+}
 
-    internal fun cancel() {
-        scope.cancel()
-    }
+/** Snackbar Host 내부에서 요청 대기열과 중복 key를 관리합니다. */
+@Stable
+internal class ClipySnackbarManager(
+    internal val hostState: SnackbarHostState,
+) {
+    private val registeredKeys = mutableSetOf<String>()
 
-    private fun enqueue(
+    @MainThread
+    internal suspend fun showSnackbar(
         key: String,
-        show: suspend () -> SnackbarResult,
-        onAction: (() -> Unit)?,
+        message: String,
+        icon: ClipySnackbarIcon?,
+        action: ClipyTextAction?,
     ) {
-        if (!scope.isActive || !registeredKeys.add(key)) {
+        if (!registeredKeys.add(key)) {
             return
         }
 
-        scope.launch {
-            try {
-                if (show() == SnackbarResult.ActionPerformed) {
-                    onAction?.invoke()
-                }
-            } finally {
-                registeredKeys.remove(key)
-            }
+        val result = try {
+            hostState.showClipySnackbar(
+                message = message,
+                actionLabel = action?.label,
+                icon = icon,
+            )
+        } finally {
+            registeredKeys.remove(key)
+        }
+
+        if (result == SnackbarResult.ActionPerformed) {
+            action?.onClick?.invoke()
         }
     }
 }
 
-/** 현재 Composition 수명에 맞춰 Snackbar Manager와 요청 대기열을 생성합니다. */
-@Composable
-fun rememberClipySnackbarManager(): ClipySnackbarManager {
-    val parentScope = rememberCoroutineScope()
-    val hostState = remember { SnackbarHostState() }
-    val manager = remember(
-        hostState,
-        parentScope,
-    ) {
-        ClipySnackbarManager(
-            hostState = hostState,
-            parentScope = parentScope,
-        )
-    }
+internal val LocalClipySnackbarManager = staticCompositionLocalOf<ClipySnackbarManager> {
+    error("ClipySnackbarManager is not provided.")
+}
 
-    return manager
+/** 현재 Snackbar Host에 연결된 Snackbar 요청 API를 반환합니다. */
+@Composable
+fun rememberClipySnackbarController(): ClipySnackbarController {
+    val manager = LocalClipySnackbarManager.current
+
+    return remember(manager) {
+        ClipySnackbarController(manager)
+    }
+}
+
+@Composable
+internal fun rememberClipySnackbarManager(): ClipySnackbarManager {
+    val hostState = remember { SnackbarHostState() }
+
+    return remember(hostState) {
+        ClipySnackbarManager(hostState)
+    }
 }

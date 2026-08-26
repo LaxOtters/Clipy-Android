@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -41,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -73,67 +76,96 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
-/**
- * [manager]에 등록된 요청을 앱 상단 Snackbar로 표시합니다.
- *
- * [modifier]는 앱 UI 전체 영역을 차지해야 합니다.
- * Snackbar 바깥을 터치하면 현재 Snackbar가 닫히며 같은 터치는 아래 화면에도 전달됩니다.
- */
+/** 앱 콘텐츠와 Snackbar 영역을 함께 배치하고, Snackbar 영역 밖 터치로 현재 Snackbar를 닫습니다. */
 @Composable
-fun ClipySnackbarHost(
-    manager: ClipySnackbarManager,
+fun ClipySnackbarLayout(
     modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
 ) {
+    val manager = rememberClipySnackbarManager()
     val hostState = manager.hostState
     var hostPositionInRoot by remember { mutableStateOf(Offset.Zero) }
     var outsideTapState by remember { mutableStateOf(SnackbarOutsideTapState()) }
 
-    Box(
-        modifier = modifier
-            .onGloballyPositioned { hostPositionInRoot = it.positionInRoot() }
-            .detectSnackbarOutsideTap { position ->
-                if (
-                    outsideTapState.shouldDismiss(
+    CompositionLocalProvider(
+        LocalClipySnackbarManager provides manager,
+    ) {
+        Box(
+            modifier = modifier
+                .onGloballyPositioned { hostPositionInRoot = it.positionInRoot() }
+                .notifySnackbarPointerDown { position ->
+                    val shouldDismiss = outsideTapState.shouldDismiss(
                         currentSnackbarData = hostState.currentSnackbarData,
                         tapPosition = position,
                     )
-                ) {
-                    hostState.currentSnackbarData?.dismiss()
-                }
-            },
-    ) {
-        SnackbarHost(
-            hostState = hostState,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(
-                    start = SnackbarDefaults.screenHorizontalPadding,
-                    top = SnackbarDefaults.statusBarSpacing,
-                    end = SnackbarDefaults.screenHorizontalPadding,
-                ),
-        ) { snackbarData ->
-            SnackbarEntry(
-                snackbarData = snackbarData,
-                onBoundsChanged = { boundsInRoot ->
+                    if (shouldDismiss) {
+                        hostState.currentSnackbarData?.dismiss()
+                    }
+                },
+        ) {
+            content()
+            ClipySnackbarHost(
+                hostState = hostState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(
+                        start = SnackbarDefaults.screenHorizontalPadding,
+                        top = SnackbarDefaults.statusBarSpacing,
+                        end = SnackbarDefaults.screenHorizontalPadding,
+                    ),
+                onBoundsChanged = { snackbarData, boundsInRoot ->
                     outsideTapState = outsideTapState.updateBounds(
                         activeSnackbarData = hostState.currentSnackbarData,
                         snackbarData = snackbarData,
                         bounds = boundsInRoot.translate(-hostPositionInRoot),
                     )
                 },
-                onOutsideTapEnabled = {
+                onOutsideTapEnabled = { snackbarData ->
                     outsideTapState = outsideTapState.enableDismiss(
                         activeSnackbarData = hostState.currentSnackbarData,
                         snackbarData = snackbarData,
                     )
                 },
-                onDisposed = {
+                onDisposed = { snackbarData ->
                     outsideTapState = outsideTapState.clearIfMatches(snackbarData)
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun ClipySnackbarHost(
+    hostState: SnackbarHostState,
+    onBoundsChanged: (
+        snackbarData: SnackbarData,
+        boundsInRoot: Rect,
+    ) -> Unit,
+    onOutsideTapEnabled: (SnackbarData) -> Unit,
+    onDisposed: (SnackbarData) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SnackbarHost(
+        hostState = hostState,
+        modifier = modifier,
+    ) { snackbarData ->
+        SnackbarEntry(
+            snackbarData = snackbarData,
+            onBoundsChanged = { boundsInRoot ->
+                onBoundsChanged(
+                    snackbarData,
+                    boundsInRoot,
+                )
+            },
+            onOutsideTapEnabled = {
+                onOutsideTapEnabled(snackbarData)
+            },
+            onDisposed = {
+                onDisposed(snackbarData)
+            },
+        )
     }
 }
 
@@ -233,6 +265,13 @@ private fun SnackbarSurface(
                 shadow = SnackbarDefaults.shadow,
             )
             .clip(SnackbarDefaults.shape)
+            .then(
+                if (isVisible) {
+                    Modifier.consumeSnackbarPointerInput()
+                } else {
+                    Modifier
+                },
+            )
             .onGloballyPositioned { coordinates ->
                 onPositioned(
                     coordinates.boundsInRoot(),
@@ -261,6 +300,21 @@ private fun SnackbarSurface(
             actionEnabled = isVisible,
             onActionClick = onActionClick,
         )
+    }
+}
+
+/** Snackbar 영역의 터치를 소비해 아래 앱 콘텐츠에 전달하지 않습니다. */
+private fun Modifier.consumeSnackbarPointerInput(): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            awaitPointerEvent(PointerEventPass.Main)
+                .changes
+                .forEach { change ->
+                    if (!change.isConsumed) {
+                        change.consume()
+                    }
+                }
+        }
     }
 }
 
@@ -499,26 +553,26 @@ private fun SnackbarPreviewSurface(
     }
 }
 
-/** Snackbar 바깥 터치를 감지하며 아래 화면의 클릭 동작을 막지 않습니다. */
-private fun Modifier.detectSnackbarOutsideTap(
+/** Snackbar 영역 밖 터치 dismiss 여부를 판단하고, 이벤트는 소비하지 않습니다. */
+private fun Modifier.notifySnackbarPointerDown(
     onPointerDown: (Offset) -> Unit,
-): Modifier = this then SnackbarOutsideTapElement(onPointerDown)
+): Modifier = this then SnackbarPointerDownElement(onPointerDown)
 
-private data class SnackbarOutsideTapElement(
+private data class SnackbarPointerDownElement(
     val onPointerDown: (Offset) -> Unit,
-) : ModifierNodeElement<SnackbarOutsideTapNode>() {
-    override fun create(): SnackbarOutsideTapNode = SnackbarOutsideTapNode(onPointerDown)
+) : ModifierNodeElement<SnackbarPointerDownNode>() {
+    override fun create(): SnackbarPointerDownNode = SnackbarPointerDownNode(onPointerDown)
 
-    override fun update(node: SnackbarOutsideTapNode) {
+    override fun update(node: SnackbarPointerDownNode) {
         node.onPointerDown = onPointerDown
     }
 
     override fun InspectorInfo.inspectableProperties() {
-        name = "detectSnackbarOutsideTap"
+        name = "notifySnackbarPointerDown"
     }
 }
 
-private class SnackbarOutsideTapNode(
+private class SnackbarPointerDownNode(
     var onPointerDown: (Offset) -> Unit,
 ) : Modifier.Node(), PointerInputModifierNode {
     override fun onPointerEvent(
@@ -535,8 +589,6 @@ private class SnackbarOutsideTapNode(
     }
 
     override fun onCancelPointerInput() = Unit
-
-    override fun sharePointerInputWithSiblings(): Boolean = true
 }
 
 internal object SnackbarDefaults {
@@ -562,12 +614,12 @@ internal object SnackbarDefaults {
 }
 
 @Preview(
-    name = "Snackbar · Text and action",
+    name = "Snackbar",
     showBackground = true,
     widthDp = 390,
 )
 @Composable
-private fun SnackbarContentPreview() {
+private fun SnackbarPreview() {
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -589,19 +641,6 @@ private fun SnackbarContentPreview() {
             message = "Long text Snackbar Example\nLong text Snackbar Example",
             actionLabel = "Long Action Example",
         )
-    }
-}
-
-@Preview(
-    name = "Snackbar · Icon",
-    showBackground = true,
-    widthDp = 390,
-)
-@Composable
-private fun SnackbarIconPreview() {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
         SnackbarPreviewSurface(
             message = "Error",
             icon = ClipySnackbarIcon.Error,

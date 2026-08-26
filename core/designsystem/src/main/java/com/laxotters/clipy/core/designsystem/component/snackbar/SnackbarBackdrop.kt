@@ -50,7 +50,7 @@ internal fun BoxScope.SnackbarBackdrop(backdropBitmap: Bitmap?) {
     )
 }
 
-/** 지정된 Window 영역을 Snackbar 배경 Bitmap으로 복사합니다. */
+/** Snackbar 영역 뒤에 표시할 화면 일부를 Bitmap으로 복사합니다. */
 @RequiresApi(Build.VERSION_CODES.O)
 internal suspend fun captureSnackbarBackdrop(
     context: Context,
@@ -70,7 +70,7 @@ internal suspend fun captureSnackbarBackdrop(
                 sourceRect,
                 bitmap,
                 { result ->
-                    // 취소된 요청의 Bitmap은 PixelCopy가 완료된 뒤 해제합니다.
+                    // 취소 후에도 PixelCopy callback이 올 수 있으므로 여기서 Bitmap을 해제합니다.
                     if (!continuation.isActive) {
                         bitmap.recycleIfNeeded()
                     } else if (result == PixelCopy.SUCCESS) {
@@ -94,7 +94,7 @@ internal suspend fun captureSnackbarBackdrop(
     }
 }
 
-/** PixelCopy 요청을 Bitmap 결과 없이 완료합니다. */
+/** 캡처 실패를 Bitmap 없음으로 완료합니다. */
 private fun CancellableContinuation<Bitmap?>.resumeWithoutBitmap() {
     resumeWith(Result.success(null))
 }
