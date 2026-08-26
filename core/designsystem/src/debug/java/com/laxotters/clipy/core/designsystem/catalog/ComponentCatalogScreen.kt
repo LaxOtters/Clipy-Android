@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.laxotters.clipy.core.designsystem.component.ClipyDivider
+import com.laxotters.clipy.core.designsystem.component.ClipyTextAction
+import com.laxotters.clipy.core.designsystem.component.ClipyTextInputAction
 import com.laxotters.clipy.core.designsystem.component.DividerDefaults
 import com.laxotters.clipy.core.designsystem.component.actionmenu.ClipyActionMenu
 import com.laxotters.clipy.core.designsystem.component.actionmenu.model.ActionMenuIcon
@@ -34,6 +36,12 @@ import com.laxotters.clipy.core.designsystem.component.button.ClipyFooterButton
 import com.laxotters.clipy.core.designsystem.component.button.model.ButtonSize
 import com.laxotters.clipy.core.designsystem.component.button.model.ButtonType
 import com.laxotters.clipy.core.designsystem.component.button.model.FooterButtonType
+import com.laxotters.clipy.core.designsystem.component.dialog.ClipyDialogStyle
+import com.laxotters.clipy.core.designsystem.component.dialog.ClipyDualDialog
+import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialog
+import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogState
+import com.laxotters.clipy.core.designsystem.component.dialog.ClipySingleDialog
+import com.laxotters.clipy.core.designsystem.component.error.ClipyErrorOverlay
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 
 @Composable
@@ -55,6 +63,8 @@ fun ComponentCatalogScreen(modifier: Modifier = Modifier) {
         FooterButtonSection()
         DividerSection()
         ActionMenuSection()
+        DialogSection()
+        ErrorOverlaySection()
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -210,6 +220,197 @@ private fun catalogActionMenuItems(
 )
 
 @Composable
+private fun DialogSection() {
+    var appDialog by remember { mutableStateOf<CatalogAppDialog?>(null) }
+    var jsDialog by remember { mutableStateOf<CatalogJsDialog?>(null) }
+
+    CatalogSection(
+        title = "Dialog",
+    ) {
+        CatalogStateLabel("App dialog · Single action")
+        ClipyButton(
+            text = "Open app dialog",
+            onClick = { appDialog = CatalogAppDialog.Single },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("App dialog · Two actions")
+        ClipyButton(
+            text = "Open confirmation",
+            onClick = { appDialog = CatalogAppDialog.Dual },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("App dialog · Error · Single / Two actions")
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ClipyButton(
+                text = "Error single",
+                onClick = { appDialog = CatalogAppDialog.ErrorSingle },
+                size = ButtonSize.Small,
+            )
+            ClipyButton(
+                text = "Error two",
+                onClick = { appDialog = CatalogAppDialog.ErrorDual },
+                size = ButtonSize.Small,
+            )
+        }
+        CatalogStateLabel("Js dialog · Alert / Confirm / Prompt")
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ClipyButton(
+                text = "Alert",
+                onClick = { jsDialog = CatalogJsDialog.Alert },
+                size = ButtonSize.Small,
+            )
+            ClipyButton(
+                text = "Confirm",
+                onClick = { jsDialog = CatalogJsDialog.Confirm },
+                size = ButtonSize.Small,
+            )
+            ClipyButton(
+                text = "Prompt",
+                onClick = { jsDialog = CatalogJsDialog.Prompt },
+                size = ButtonSize.Small,
+            )
+        }
+    }
+
+    when (appDialog) {
+        CatalogAppDialog.Single -> ClipySingleDialog(
+            title = "연결할 수 없습니다",
+            description = "잠시 후 다시 시도해주세요.",
+            primaryAction = ClipyTextAction(
+                label = "확인",
+                onClick = { appDialog = null },
+            ),
+        )
+
+        CatalogAppDialog.Dual -> ClipyDualDialog(
+            title = "항목을 삭제할까요?",
+            description = "삭제한 항목은 되돌릴 수 없습니다.",
+            primaryAction = ClipyTextAction(
+                label = "삭제",
+                onClick = { appDialog = null },
+            ),
+            secondaryAction = ClipyTextAction(
+                label = "취소",
+                onClick = { appDialog = null },
+            ),
+        )
+
+        CatalogAppDialog.ErrorSingle -> ClipySingleDialog(
+            title = "연결할 수 없습니다",
+            description = "잠시 후 다시 시도해주세요.",
+            primaryAction = ClipyTextAction(
+                label = "확인",
+                onClick = { appDialog = null },
+            ),
+            style = ClipyDialogStyle.Error,
+        )
+
+        CatalogAppDialog.ErrorDual -> ClipyDualDialog(
+            title = "항목을 삭제할 수 없습니다",
+            description = "잠시 후 다시 시도하거나 취소해주세요.",
+            primaryAction = ClipyTextAction(
+                label = "재시도",
+                onClick = { appDialog = null },
+            ),
+            secondaryAction = ClipyTextAction(
+                label = "취소",
+                onClick = { appDialog = null },
+            ),
+            style = ClipyDialogStyle.Error,
+        )
+
+        null -> Unit
+    }
+
+    when (jsDialog) {
+        CatalogJsDialog.Alert -> ClipyJsDialog(
+            source = "Request from example.com",
+            state = ClipyJsDialogState.Alert(
+                title = "알림",
+                description = "웹사이트에서 메시지를 보냈습니다.",
+                confirmAction = ClipyTextAction(
+                    label = "확인",
+                    onClick = { jsDialog = null },
+                ),
+            ),
+        )
+
+        CatalogJsDialog.Confirm -> ClipyJsDialog(
+            source = "Request from example.com",
+            state = ClipyJsDialogState.Confirm(
+                title = "계속 진행할까요?",
+                description = "웹사이트 요청을 확인해주세요.",
+                confirmAction = ClipyTextAction(
+                    label = "확인",
+                    onClick = { jsDialog = null },
+                ),
+                cancelAction = ClipyTextAction(
+                    label = "취소",
+                    onClick = { jsDialog = null },
+                ),
+            ),
+        )
+
+        CatalogJsDialog.Prompt -> ClipyJsDialog(
+            source = "Request from example.com",
+            state = ClipyJsDialogState.Prompt(
+                title = "이름을 입력해주세요",
+                description = "웹사이트에 전달할 값을 입력하세요.",
+                confirmAction = ClipyTextInputAction(
+                    label = "확인",
+                    onClick = { jsDialog = null },
+                ),
+                initialValue = "Clipy",
+                cancelAction = ClipyTextAction(
+                    label = "취소",
+                    onClick = { jsDialog = null },
+                ),
+            ),
+        )
+
+        null -> Unit
+    }
+}
+
+@Composable
+private fun ErrorOverlaySection() {
+    CatalogSection(
+        title = "Error overlay",
+    ) {
+        CatalogStateLabel("Default")
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(280.dp),
+        ) {
+            ClipyErrorOverlay(
+                title = "페이지를 불러올 수 없습니다",
+                description = "잠시 후 다시 시도해주세요.",
+            )
+        }
+        CatalogStateLabel("Secondary action")
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(340.dp),
+        ) {
+            ClipyErrorOverlay(
+                title = "페이지를 불러올 수 없습니다",
+                description = "인터넷 연결을 확인한 후\n다시 시도해주세요.",
+                action = ClipyTextAction(
+                    label = "다시 시도",
+                    onClick = {},
+                ),
+            )
+        }
+    }
+}
+
+@Composable
 private fun CatalogSection(
     title: String,
     content: @Composable () -> Unit,
@@ -238,6 +439,19 @@ private fun CatalogStateLabel(
         color = ClipyTheme.colors.neutral.gray600,
         style = ClipyTheme.typography.body3Medium,
     )
+}
+
+private enum class CatalogJsDialog {
+    Alert,
+    Confirm,
+    Prompt,
+}
+
+private enum class CatalogAppDialog {
+    Single,
+    Dual,
+    ErrorSingle,
+    ErrorDual,
 }
 
 @Preview(
