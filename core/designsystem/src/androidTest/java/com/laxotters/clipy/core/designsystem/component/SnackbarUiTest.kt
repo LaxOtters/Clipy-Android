@@ -5,8 +5,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
@@ -21,9 +25,11 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarHost
-import com.laxotters.clipy.core.designsystem.component.snackbar.rememberClipySnackbarManager
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarController
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarLayout
+import com.laxotters.clipy.core.designsystem.component.snackbar.rememberClipySnackbarController
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -38,26 +44,28 @@ class SnackbarUiTest {
     @Test
     fun snackbarAction_performsAction() {
         var actionCount = 0
+        var backgroundClickCount = 0
 
         composeTestRule.setContent {
             ClipyTheme {
-                val manager = rememberClipySnackbarManager()
-                LaunchedEffect(Unit) {
-                    manager.showSnackbar(
+                ClipySnackbarLayout(
+                    modifier = Modifier
+                        .width(200.dp)
+                        .height(200.dp),
+                ) {
+                    SnackbarRequest(
                         message = "Could not connect.",
                         action = ClipyTextAction(
                             label = "Retry",
                             onClick = { actionCount++ },
                         ),
                     )
+                    ClickableBackground { backgroundClickCount++ }
                 }
-                ClipySnackbarHost(manager = manager)
             }
         }
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText("Retry").fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForSnackbar("Retry")
         composeTestRule.onNodeWithText("Retry").performClick()
 
         composeTestRule.runOnIdle {
@@ -65,7 +73,26 @@ class SnackbarUiTest {
                 1,
                 actionCount,
             )
+            assertEquals(
+                0,
+                backgroundClickCount,
+            )
         }
+    }
+
+    @Test
+    fun snackbarController_requestIsDisplayedBySharedLayout() {
+        val message = "Shared snackbar"
+
+        composeTestRule.setContent {
+            ClipyTheme {
+                ClipySnackbarLayout {
+                    SnackbarRequest(message = message)
+                }
+            }
+        }
+
+        waitForSnackbar(message)
     }
 
     @Test
@@ -74,9 +101,8 @@ class SnackbarUiTest {
 
         composeTestRule.setContent {
             ClipyTheme {
-                val manager = rememberClipySnackbarManager()
-                LaunchedEffect(Unit) {
-                    manager.showSnackbar(
+                ClipySnackbarLayout {
+                    SnackbarRequest(
                         message = "Could not connect.",
                         action = ClipyTextAction(
                             label = actionLabel,
@@ -84,13 +110,10 @@ class SnackbarUiTest {
                         ),
                     )
                 }
-                ClipySnackbarHost(manager = manager)
             }
         }
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(actionLabel).fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForSnackbar(actionLabel)
         composeTestRule.waitForIdle()
 
         val actionBounds = composeTestRule
@@ -109,27 +132,15 @@ class SnackbarUiTest {
         val message = "Long text Snackbar Example\nLong text Snackbar Example"
         val actionLabel = "Long Action Example"
 
-        composeTestRule.setContent {
-            ClipyTheme {
-                val manager = rememberClipySnackbarManager()
-                LaunchedEffect(Unit) {
-                    manager.showSnackbar(
-                        message = message,
-                        action = ClipyTextAction(
-                            label = actionLabel,
-                            onClick = {},
-                        ),
-                    )
-                }
-                Box(modifier = Modifier.width(390.dp)) {
-                    ClipySnackbarHost(manager = manager)
-                }
-            }
-        }
-
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(actionLabel).fetchSemanticsNodes().isNotEmpty()
-        }
+        setSnackbarContent(
+            width = 390,
+            message = message,
+            action = ClipyTextAction(
+                label = actionLabel,
+                onClick = {},
+            ),
+        )
+        waitForSnackbar(actionLabel)
         composeTestRule.waitForIdle()
 
         val messageBounds = composeTestRule.onNodeWithText(message).fetchSemanticsNode().boundsInRoot
@@ -143,27 +154,15 @@ class SnackbarUiTest {
         val message = "text\ntext"
         val actionLabel = "Action"
 
-        composeTestRule.setContent {
-            ClipyTheme {
-                val manager = rememberClipySnackbarManager()
-                LaunchedEffect(Unit) {
-                    manager.showSnackbar(
-                        message = message,
-                        action = ClipyTextAction(
-                            label = actionLabel,
-                            onClick = {},
-                        ),
-                    )
-                }
-                Box(modifier = Modifier.width(390.dp)) {
-                    ClipySnackbarHost(manager = manager)
-                }
-            }
-        }
-
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(actionLabel).fetchSemanticsNodes().isNotEmpty()
-        }
+        setSnackbarContent(
+            width = 390,
+            message = message,
+            action = ClipyTextAction(
+                label = actionLabel,
+                onClick = {},
+            ),
+        )
+        waitForSnackbar(actionLabel)
         composeTestRule.waitForIdle()
 
         val messageBounds = composeTestRule.onNodeWithText(message).fetchSemanticsNode().boundsInRoot
@@ -181,15 +180,15 @@ class SnackbarUiTest {
         composeTestRule.setContent {
             ClipyTheme {
                 val currentDensity = LocalDensity.current
+
                 CompositionLocalProvider(
                     LocalDensity provides Density(
                         density = currentDensity.density,
                         fontScale = 1.5f,
                     ),
                 ) {
-                    val manager = rememberClipySnackbarManager()
-                    LaunchedEffect(Unit) {
-                        manager.showSnackbar(
+                    ClipySnackbarLayout(modifier = Modifier.width(390.dp)) {
+                        SnackbarRequest(
                             message = message,
                             action = ClipyTextAction(
                                 label = actionLabel,
@@ -197,16 +196,11 @@ class SnackbarUiTest {
                             ),
                         )
                     }
-                    Box(modifier = Modifier.width(390.dp)) {
-                        ClipySnackbarHost(manager = manager)
-                    }
                 }
             }
         }
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(actionLabel).fetchSemanticsNodes().isNotEmpty()
-        }
+        waitForSnackbar(actionLabel)
         composeTestRule.waitForIdle()
 
         val messageBounds = composeTestRule.onNodeWithText(message).fetchSemanticsNode().boundsInRoot
@@ -222,51 +216,58 @@ class SnackbarUiTest {
 
         composeTestRule.setContent {
             ClipyTheme {
-                val manager = rememberClipySnackbarManager()
-                LaunchedEffect(Unit) {
-                    manager.showSnackbar(message = message)
-                }
-                Box(
+                ClipySnackbarLayout(
                     modifier = Modifier
                         .width(200.dp)
-                        .height(200.dp),
+                        .height(200.dp)
+                        .testTag(SNACKBAR_LAYOUT_TAG),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable { backgroundClickCount++ },
-                    )
-                    ClipySnackbarHost(
-                        manager = manager,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("snackbar-host"),
-                    )
+                    SnackbarRequest(message = message)
+                    ClickableBackground { backgroundClickCount++ }
                 }
             }
         }
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(message).fetchSemanticsNodes().isNotEmpty()
-        }
-        val hostBounds = composeTestRule.onNodeWithTag("snackbar-host").fetchSemanticsNode().boundsInRoot
-        composeTestRule.onNodeWithTag("snackbar-host").performTouchInput {
-            click(
-                Offset(
-                    x = hostBounds.width / 2f,
-                    y = hostBounds.height - 1f,
-                ),
-            )
-        }
-        composeTestRule.waitUntil(timeoutMillis = 1_000) {
-            composeTestRule.onAllNodesWithText(message).fetchSemanticsNodes().isEmpty()
-        }
+        waitForSnackbar(message)
+        clickSnackbarOutside()
+        waitForSnackbarToDisappear(message)
+
         composeTestRule.runOnIdle {
             assertEquals(
                 1,
                 backgroundClickCount,
             )
         }
+    }
+
+    @Test
+    fun snackbarMessageTouch_doesNotReachBackgroundOrDismiss() {
+        val message = "Item saved"
+        var backgroundClickCount = 0
+
+        composeTestRule.setContent {
+            ClipyTheme {
+                ClipySnackbarLayout(
+                    modifier = Modifier
+                        .width(200.dp)
+                        .height(200.dp),
+                ) {
+                    SnackbarRequest(message = message)
+                    ClickableBackground { backgroundClickCount++ }
+                }
+            }
+        }
+
+        waitForSnackbar(message)
+        composeTestRule.onNodeWithText(message).performTouchInput { click() }
+
+        composeTestRule.runOnIdle {
+            assertEquals(
+                0,
+                backgroundClickCount,
+            )
+        }
+        composeTestRule.onNodeWithText(message).fetchSemanticsNode()
     }
 
     @Test
@@ -277,58 +278,32 @@ class SnackbarUiTest {
 
         composeTestRule.setContent {
             ClipyTheme {
-                val manager = rememberClipySnackbarManager()
-                LaunchedEffect(Unit) {
-                    manager.showSnackbar(message = firstMessage)
-                    manager.showSnackbar(message = secondMessage)
-                }
-                Box(
+                ClipySnackbarLayout(
                     modifier = Modifier
                         .width(200.dp)
-                        .height(200.dp),
+                        .height(200.dp)
+                        .testTag(SNACKBAR_LAYOUT_TAG),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable { backgroundClickCount++ },
-                    )
-                    ClipySnackbarHost(
-                        manager = manager,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("snackbar-host"),
-                    )
+                    val controller = rememberClipySnackbarController()
+
+                    LaunchedEffect(controller) {
+                        launch {
+                            controller.showSnackbar(message = firstMessage)
+                        }
+                        launch {
+                            controller.showSnackbar(message = secondMessage)
+                        }
+                    }
+                    ClickableBackground { backgroundClickCount++ }
                 }
             }
         }
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(firstMessage).fetchSemanticsNodes().isNotEmpty()
-        }
-        val hostBounds = composeTestRule.onNodeWithTag("snackbar-host").fetchSemanticsNode().boundsInRoot
-        composeTestRule.onNodeWithTag("snackbar-host").performTouchInput {
-            click(
-                Offset(
-                    x = hostBounds.width / 2f,
-                    y = hostBounds.height - 1f,
-                ),
-            )
-        }
-
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(secondMessage).fetchSemanticsNodes().isNotEmpty()
-        }
-        composeTestRule.onNodeWithTag("snackbar-host").performTouchInput {
-            click(
-                Offset(
-                    x = hostBounds.width / 2f,
-                    y = hostBounds.height - 1f,
-                ),
-            )
-        }
-        composeTestRule.waitUntil(timeoutMillis = 1_000) {
-            composeTestRule.onAllNodesWithText(secondMessage).fetchSemanticsNodes().isEmpty()
-        }
+        waitForSnackbar(firstMessage)
+        clickSnackbarOutside()
+        waitForSnackbar(secondMessage)
+        clickSnackbarOutside()
+        waitForSnackbarToDisappear(secondMessage)
 
         composeTestRule.runOnIdle {
             assertEquals(
@@ -339,22 +314,60 @@ class SnackbarUiTest {
     }
 
     @Test
-    fun snackbar_dismissesAfterTwoSeconds() {
-        val message = "Timed snackbar"
+    fun routeContentRemoval_cancelsItsSnackbarRequest() {
+        val message = "Route snackbar"
+        var routeVisible by mutableStateOf(true)
 
         composeTestRule.setContent {
             ClipyTheme {
-                val manager = rememberClipySnackbarManager()
-                LaunchedEffect(Unit) {
-                    manager.showSnackbar(message = message)
+                ClipySnackbarLayout {
+                    if (routeVisible) {
+                        SnackbarRequest(message = message)
+                    }
                 }
-                ClipySnackbarHost(manager = manager)
             }
         }
 
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText(message).fetchSemanticsNodes().isNotEmpty()
+        waitForSnackbar(message)
+        composeTestRule.runOnIdle {
+            routeVisible = false
         }
+
+        waitForSnackbarToDisappear(message)
+    }
+
+    @Test
+    fun requestKeyChange_cancelsPreviousSnackbar() {
+        val previousMessage = "Previous snackbar"
+        val currentMessage = "Current snackbar"
+        var message by mutableStateOf(previousMessage)
+
+        composeTestRule.setContent {
+            ClipyTheme {
+                ClipySnackbarLayout {
+                    SnackbarRequest(message = message)
+                }
+            }
+        }
+
+        waitForSnackbar(previousMessage)
+        composeTestRule.runOnIdle {
+            message = currentMessage
+        }
+
+        waitForSnackbarToDisappear(previousMessage)
+        waitForSnackbar(currentMessage)
+    }
+
+    @Test
+    fun snackbar_dismissesAfterTwoSeconds() {
+        val message = "Timed snackbar"
+
+        setSnackbarContent(
+            width = 390,
+            message = message,
+        )
+        waitForSnackbar(message)
         val displayedAt = System.currentTimeMillis()
 
         composeTestRule.waitUntil(timeoutMillis = 3_000) {
@@ -363,4 +376,94 @@ class SnackbarUiTest {
 
         assertTrue(System.currentTimeMillis() - displayedAt >= 1_800)
     }
+
+    private fun setSnackbarContent(
+        width: Int,
+        message: String,
+        action: ClipyTextAction? = null,
+    ) {
+        composeTestRule.setContent {
+            ClipyTheme {
+                ClipySnackbarLayout(modifier = Modifier.width(width.dp)) {
+                    SnackbarRequest(
+                        message = message,
+                        action = action,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun waitForSnackbar(text: String) {
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    private fun waitForSnackbarToDisappear(text: String) {
+        composeTestRule.waitUntil(timeoutMillis = 1_000) {
+            composeTestRule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty()
+        }
+    }
+
+    private fun clickSnackbarOutside() {
+        val layoutBounds = composeTestRule
+            .onNodeWithTag(SNACKBAR_LAYOUT_TAG)
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        composeTestRule.onNodeWithTag(SNACKBAR_LAYOUT_TAG).performTouchInput {
+            click(
+                Offset(
+                    x = layoutBounds.width / 2f,
+                    y = layoutBounds.height - 1f,
+                ),
+            )
+        }
+    }
+
+    private companion object {
+        const val SNACKBAR_LAYOUT_TAG = "snackbar-layout"
+    }
+}
+
+@Composable
+private fun SnackbarRequest(
+    message: String,
+    action: ClipyTextAction? = null,
+) {
+    val controller = rememberClipySnackbarController()
+
+    ShowSnackbarRequest(
+        controller = controller,
+        message = message,
+        action = action,
+    )
+}
+
+@Composable
+private fun ShowSnackbarRequest(
+    controller: ClipySnackbarController,
+    message: String,
+    action: ClipyTextAction? = null,
+) {
+    LaunchedEffect(
+        controller,
+        message,
+        action,
+    ) {
+        controller.showSnackbar(
+            message = message,
+            action = action,
+        )
+    }
+}
+
+@Composable
+private fun ClickableBackground(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(onClick = onClick),
+    )
 }
