@@ -4,14 +4,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarLayout
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import com.laxotters.clipy.feature.home.navigation.homeEntry
 import com.laxotters.clipy.feature.main.navigation.rememberAppNavigationState
@@ -57,12 +60,16 @@ private fun ClipyApp(
         sessionEntry(navigateToHome = navigator::navigateToHome)
     }
 
-    NavDisplay(
-        entries = navigationState.toEntries(appEntryProvider),
-        onBack = {
-            if (!navigator.goBack()) {
-                onExit()
-            }
-        },
-    )
+    ClipySnackbarLayout(
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        NavDisplay(
+            entries = navigationState.toEntries(appEntryProvider),
+            onBack = {
+                if (!navigator.goBack()) {
+                    onExit()
+                }
+            },
+        )
+    }
 }

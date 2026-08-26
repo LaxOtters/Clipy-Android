@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,40 +43,62 @@ import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialog
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogState
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipySingleDialog
 import com.laxotters.clipy.core.designsystem.component.error.ClipyErrorOverlay
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarController
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarIcon
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarLayout
+import com.laxotters.clipy.core.designsystem.component.snackbar.rememberClipySnackbarController
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
+import kotlinx.coroutines.launch
 
 @Composable
 fun ComponentCatalogScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(ClipyTheme.colors.neutral.gray50)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(32.dp),
+    ClipySnackbarLayout(
+        modifier = modifier.fillMaxSize(),
     ) {
-        Text(
-            text = "Clipy Component Catalog",
-            color = ClipyTheme.colors.neutral.gray950,
-            style = ClipyTheme.typography.heading1,
-        )
-        ButtonSection()
-        FooterButtonSection()
-        DividerSection()
-        ActionMenuSection()
-        DialogSection()
-        ErrorOverlaySection()
-        Spacer(Modifier.height(24.dp))
+        val snackbar = rememberClipySnackbarController()
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(ClipyTheme.colors.neutral.gray50)
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    horizontal = 20.dp,
+                    vertical = 24.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
+        ) {
+            Text(
+                text = "Clipy Component Catalog",
+                color = ClipyTheme.colors.neutral.gray950,
+                style = ClipyTheme.typography.heading1,
+            )
+            ButtonSection()
+            FooterButtonSection()
+            DividerSection()
+            ActionMenuSection()
+            DialogSection()
+            ErrorOverlaySection()
+            SnackbarSection(snackbar = snackbar)
+            Spacer(Modifier.height(24.dp))
+        }
     }
 }
 
 @Composable
 private fun ButtonSection() {
-    CatalogSection(title = "Button") {
+    CatalogSection(
+        title = "Button",
+    ) {
         ButtonType.entries.forEach { type ->
             CatalogStateLabel("${type.name} · Medium")
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                listOf(true, false).forEach { enabled ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                listOf(
+                    true,
+                    false,
+                ).forEach { enabled ->
                     ClipyButton(
                         text = if (enabled) "Enabled" else "Disabled",
                         onClick = {},
@@ -87,8 +110,13 @@ private fun ButtonSection() {
             }
         }
         CatalogStateLabel("Primary · Small")
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            listOf(true, false).forEach { enabled ->
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            listOf(
+                true,
+                false,
+            ).forEach { enabled ->
                 ClipyButton(
                     text = if (enabled) "Enabled" else "Disabled",
                     onClick = {},
@@ -102,9 +130,14 @@ private fun ButtonSection() {
 
 @Composable
 private fun FooterButtonSection() {
-    CatalogSection(title = "Footer Button") {
+    CatalogSection(
+        title = "Footer Button",
+    ) {
         FooterButtonType.entries.forEach { type ->
-            listOf(true, false).forEach { enabled ->
+            listOf(
+                true,
+                false,
+            ).forEach { enabled ->
                 CatalogStateLabel("${type.name} · ${if (enabled) "Enabled" else "Disabled"}")
                 ClipyFooterButton(
                     text = "Confirm",
@@ -119,14 +152,16 @@ private fun FooterButtonSection() {
 
 @Composable
 private fun DividerSection() {
-    CatalogSection(title = "Divider") {
+    CatalogSection(
+        title = "Divider",
+    ) {
         listOf(
             "Large · 40dp" to DividerDefaults.largeVerticalPadding,
             "Medium · 20dp" to DividerDefaults.mediumVerticalPadding,
             "Small · 10dp" to DividerDefaults.smallVerticalPadding,
-        ).forEach { (label, padding) ->
-            CatalogStateLabel(label)
-            ClipyDivider(verticalPadding = padding)
+        ).forEach { labeledPadding ->
+            CatalogStateLabel(labeledPadding.first)
+            ClipyDivider(verticalPadding = labeledPadding.second)
         }
     }
 }
@@ -139,7 +174,9 @@ private fun ActionMenuSection() {
         mutableStateOf(ActionMenuPlacement.BottomEnd)
     }
 
-    CatalogSection(title = "Action Menu") {
+    CatalogSection(
+        title = "Action Menu",
+    ) {
         CatalogStateLabel("Default · Destructive")
         Text(
             text = "Placement: ${selectedPlacement.name}\n" +
@@ -147,11 +184,15 @@ private fun ActionMenuSection() {
             color = ClipyTheme.colors.neutral.gray800,
             style = ClipyTheme.typography.body2Medium,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             ActionMenuPlacement.entries
                 .chunked(2)
                 .forEach { placements ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         placements.forEach { placement ->
                             ClipyButton(
                                 text = placement.name,
@@ -373,6 +414,125 @@ private fun DialogSection() {
         )
 
         null -> Unit
+    }
+}
+
+@Composable
+private fun SnackbarSection(snackbar: ClipySnackbarController) {
+    val coroutineScope = rememberCoroutineScope()
+
+    CatalogSection(
+        title = "Snackbar",
+    ) {
+        CatalogStateLabel("Message only · 2 seconds")
+        ClipyButton(
+            text = "Show message",
+            onClick = {
+                coroutineScope.launch {
+                    snackbar.showSnackbar(message = "항목을 저장했습니다.")
+                }
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Message with action · 2 seconds")
+        ClipyButton(
+            text = "Show action",
+            onClick = {
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "네트워크에 연결할 수 없습니다.",
+                        action = ClipyTextAction(
+                            label = "재시도",
+                            onClick = {},
+                        ),
+                    )
+                }
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Long text and action · Stacked")
+        ClipyButton(
+            text = "Show stacked action",
+            onClick = {
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "Long text Snackbar Example",
+                        action = ClipyTextAction(
+                            label = "Long Action Example",
+                            onClick = {},
+                        ),
+                    )
+                }
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Long two-line text and action · Stacked")
+        ClipyButton(
+            text = "Show stacked two lines",
+            onClick = {
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "Long text Snackbar Example\nLong text Snackbar Example",
+                        action = ClipyTextAction(
+                            label = "Long Action Example",
+                            onClick = {},
+                        ),
+                    )
+                }
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Error icon")
+        ClipyButton(
+            text = "Show error",
+            onClick = {
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "Something went wrong",
+                        icon = ClipySnackbarIcon.Error,
+                    )
+                }
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Success icon · One line")
+        ClipyButton(
+            text = "Show success",
+            onClick = {
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "Item Saved",
+                        icon = ClipySnackbarIcon.Success,
+                    )
+                }
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Success icon · Two lines")
+        ClipyButton(
+            text = "Show success two lines",
+            onClick = {
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "Item Saved\nYou can continue browsing.",
+                        icon = ClipySnackbarIcon.Success,
+                    )
+                }
+            },
+            size = ButtonSize.Small,
+        )
+        CatalogStateLabel("Two-line message")
+        ClipyButton(
+            text = "Show two lines",
+            onClick = {
+                coroutineScope.launch {
+                    snackbar.showSnackbar(
+                        message = "콘텐츠를 불러오지 못했습니다.\n잠시 후 다시 시도해주세요.",
+                    )
+                }
+            },
+            size = ButtonSize.Small,
+        )
     }
 }
 
