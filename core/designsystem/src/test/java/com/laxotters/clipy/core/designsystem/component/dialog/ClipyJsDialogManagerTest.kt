@@ -15,7 +15,7 @@ class ClipyJsDialogManagerTest {
         val request = alertRequest()
 
         assertTrue(manager.show(request))
-        assertSame(request, manager.activeRequest)
+        assertSame(request, manager.activeRequestEntry?.request)
     }
 
     @Test
@@ -25,20 +25,20 @@ class ClipyJsDialogManagerTest {
         manager.show(firstRequest)
 
         assertFalse(manager.show(alertRequest(title = "Second")))
-        assertSame(firstRequest, manager.activeRequest)
+        assertSame(firstRequest, manager.activeRequestEntry?.request)
     }
 
     @Test
-    fun activeRequest_isClearedAfterActionCompletes() {
+    fun activeRequestEntry_isClearedAfterActionCompletes() {
         val manager = ClipyJsDialogManager()
         val request = alertRequest()
         var actionCount = 0
 
         manager.show(request)
-        manager.complete(request) { actionCount++ }
+        manager.complete(requireNotNull(manager.activeRequestEntry)) { actionCount++ }
 
         assertEquals(1, actionCount)
-        assertNull(manager.activeRequest)
+        assertNull(manager.activeRequestEntry)
         assertTrue(manager.show(alertRequest(title = "Second")))
     }
 
@@ -49,41 +49,44 @@ class ClipyJsDialogManagerTest {
         var nestedRequestAccepted = true
 
         manager.show(request)
-        manager.complete(request) {
+        manager.complete(requireNotNull(manager.activeRequestEntry)) {
             nestedRequestAccepted = manager.show(alertRequest(title = "Second"))
         }
 
         assertFalse(nestedRequestAccepted)
-        assertNull(manager.activeRequest)
+        assertNull(manager.activeRequestEntry)
     }
 
     @Test
-    fun activeRequest_isClearedWhenActionThrows() {
+    fun activeRequestEntry_isClearedWhenActionThrows() {
         val manager = ClipyJsDialogManager()
         val request = alertRequest()
 
         manager.show(request)
         runCatching {
-            manager.complete(request) { error("Failed action") }
+            manager.complete(requireNotNull(manager.activeRequestEntry)) { error("Failed action") }
         }
 
-        assertNull(manager.activeRequest)
+        assertNull(manager.activeRequestEntry)
     }
 
     @Test
-    fun staleRequest_cannotCompleteNewRequest() {
+    fun staleRequestEntry_cannotCompleteNewRequest() {
         val manager = ClipyJsDialogManager()
         val staleRequest = alertRequest(title = "First")
         manager.show(staleRequest)
-        manager.complete(staleRequest) {}
+        val staleRequestEntry = requireNotNull(manager.activeRequestEntry)
+        manager.complete(staleRequestEntry) {}
 
         val activeRequest = alertRequest(title = "Second")
         manager.show(activeRequest)
+        val activeRequestEntry = requireNotNull(manager.activeRequestEntry)
         var staleActionCount = 0
-        manager.complete(staleRequest) { staleActionCount++ }
+        manager.complete(staleRequestEntry) { staleActionCount++ }
 
         assertEquals(0, staleActionCount)
-        assertSame(activeRequest, manager.activeRequest)
+        assertSame(activeRequest, activeRequestEntry.request)
+        assertSame(activeRequestEntry, manager.activeRequestEntry)
     }
 
     private fun alertRequest(title: String = "First"): ClipyJsDialogRequest.Alert =
