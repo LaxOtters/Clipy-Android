@@ -1,5 +1,6 @@
 plugins {
     id("clipy.android.application")
+    id("clipy.android.compose")
     id("clipy.android.hilt")
 }
 
@@ -37,4 +38,8 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":data:session"))
     implementation(project(":feature:main"))
+
+    androidTestImplementation(project(":feature:session"))
+    androidTestImplementation(libs.androidx.activity.compose)
+    androidTestImplementation(libs.androidx.espresso.web)
 }
