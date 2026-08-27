@@ -4,6 +4,7 @@
     <application>
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode|fontScale|fontWeightAdjustment|density"
             android:exported="true"
             android:theme="@style/Theme.Clipy.Starting">
             <intent-filter>
