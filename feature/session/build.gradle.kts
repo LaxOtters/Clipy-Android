@@ -10,6 +10,9 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation3.runtime)
 
+    androidTestImplementation(libs.androidx.espresso.web)
+    androidTestImplementation(libs.mockwebserver3)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }
