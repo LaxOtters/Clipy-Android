@@ -2,6 +2,7 @@ package com.laxotters.clipy.feature.session.webview
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
 import android.view.ViewConfiguration
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -103,7 +104,12 @@ private typealias RootScrollCallback = (
 
 private class RootScrollWebView(context: Context) : WebView(context) {
     var onRootScrolled: RootScrollCallback? = null
-    private val touchSlopPx = ViewConfiguration.get(context).scaledTouchSlop
+    private var touchSlopPx = currentTouchSlopPx()
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        touchSlopPx = currentTouchSlopPx()
+    }
 
     override fun onScrollChanged(
         left: Int,
@@ -126,4 +132,7 @@ private class RootScrollWebView(context: Context) : WebView(context) {
             )
         }
     }
+
+    private fun currentTouchSlopPx(): Int =
+        ViewConfiguration.get(context).scaledTouchSlop
 }
