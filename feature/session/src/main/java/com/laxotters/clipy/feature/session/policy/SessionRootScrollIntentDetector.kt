@@ -8,11 +8,8 @@ internal enum class SessionRootScrollDirection {
 }
 
 /**
- * WebView root scroll 콜백에서 들어오는 작은 delta를 누적해 사용자의 스크롤 방향을 확정합니다.
- *
- * thresholdPx는 호출자가 전달합니다.
- * Detector는 누적 delta가 thresholdPx에 도달하기 전에는 방향을 내지 않습니다.
- * 방향이 바뀌면 이전 누적값을 버리고, 상태 전이는 [SessionChromeStatePolicy]에서 판단합니다.
+ * 사용자 root scroll delta를 누적해 chrome 전이에 사용할 방향을 확정합니다.
+ * 입력 출처 판별은 WebView adapter가 담당합니다.
  */
 internal class SessionRootScrollIntentDetector {
     private var accumulatedDeltaY = 0
