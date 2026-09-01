@@ -1,5 +1,8 @@
 package com.laxotters.clipy.feature.session.webview
 
+import android.content.res.Configuration
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
@@ -15,11 +18,14 @@ import androidx.test.espresso.web.assertion.WebViewAssertions.webMatches
 import androidx.test.espresso.web.sugar.Web.onWebView
 import androidx.test.espresso.web.webdriver.DriverAtoms.findElement
 import androidx.test.espresso.web.webdriver.DriverAtoms.getText
+import androidx.test.espresso.web.webdriver.DriverAtoms.webClick
 import androidx.test.espresso.web.webdriver.Locator
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -38,7 +44,7 @@ import org.junit.runner.RunWith
 
 @LargeTest
 @RunWith(AndroidJUnit4::class)
-class SessionWebViewNavigationTest {
+class SessionWebViewTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
@@ -226,6 +232,73 @@ class SessionWebViewNavigationTest {
         assertTrue(webViewState.canGoBack)
     }
 
+    @Test
+    fun nonUserRootMovement_fromJavascriptAnchorAndLayout_doesNotEmitRootScroll() {
+        dispatcher.respond(
+            "/scroll",
+            htmlResponse(
+                """
+                <a id="anchor" href="#target">Jump</a>
+                <div style="height: 2500px"></div>
+                <div id="target">Target</div>
+                <div style="height: 2500px"></div>
+                """.trimIndent(),
+            ),
+        )
+        val testState = launchWebView("/scroll")
+
+        evaluateJavascript("window.scrollTo(0, 400)")
+        waitForScrollY(minimumScrollY = 400)
+        assertEquals(0, testState.rootScrollCount.get())
+
+        onWebView()
+            .withElement(findElement(Locator.ID, "anchor"))
+            .perform(webClick())
+        waitForScrollY(minimumScrollY = 2_000)
+        assertEquals(0, testState.rootScrollCount.get())
+
+        evaluateJavascript(
+            "document.body.insertAdjacentHTML('afterbegin', '<div style=\"height:300px\"></div>')",
+        )
+        composeRule.waitForIdle()
+        assertEquals(0, testState.rootScrollCount.get())
+    }
+
+    @Test
+    fun touchDragAndFling_emitRootScrollUntilFlingSettles() {
+        dispatcher.respond(
+            "/scroll",
+            htmlResponse("""<div style="height: 6000px">Scrollable</div>"""),
+        )
+        val testState = launchWebView("/scroll")
+
+        val countAtRelease = performFastUpwardSwipe(testState)
+
+        assertTrue(countAtRelease > 0)
+        composeRule.waitUntil(timeoutMillis = FLING_TIMEOUT_MILLIS) {
+            testState.rootScrollCount.get() > countAtRelease
+        }
+    }
+
+    @Test
+    fun configurationReset_ignoresCorrectionAndAllowsNextUserDrag() {
+        dispatcher.respond(
+            "/scroll",
+            htmlResponse("""<div style="height: 6000px">Scrollable</div>"""),
+        )
+        val testState = launchWebView("/scroll")
+        performFastUpwardSwipe(testState)
+        dispatchWebViewConfigurationChanged()
+        val countAfterConfiguration = testState.rootScrollCount.get()
+
+        evaluateJavascript("window.scrollTo(0, 1200)")
+        waitForScrollY(minimumScrollY = 1_200)
+        assertEquals(countAfterConfiguration, testState.rootScrollCount.get())
+
+        performFastUpwardSwipe(testState)
+        assertTrue(testState.rootScrollCount.get() > countAfterConfiguration)
+    }
+
     private fun launchWebView(path: String): WebViewTestState {
         val testState = WebViewTestState()
         val initialUrl = server.url(path).toString()
@@ -245,7 +318,9 @@ class SessionWebViewNavigationTest {
                         ),
                     )
                 },
-                onRootScrolled = { _, _, _, _ -> },
+                onRootScrolled = { _, _, _, _ ->
+                    testState.rootScrollCount.incrementAndGet()
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -296,6 +371,119 @@ class SessionWebViewNavigationTest {
         )
 
         return checkNotNull(state.get())
+    }
+
+    private fun evaluateJavascript(script: String) {
+        val completed = AtomicBoolean(false)
+        onView(isAssignableFrom(WebView::class.java)).perform(
+            webViewAction("evaluate JavaScript") { webView ->
+                webView.evaluateJavascript(script) { completed.set(true) }
+            },
+        )
+        composeRule.waitUntil(timeoutMillis = PAGE_LOAD_TIMEOUT_MILLIS) { completed.get() }
+    }
+
+    private fun waitForScrollY(minimumScrollY: Int) {
+        composeRule.waitUntil(timeoutMillis = PAGE_LOAD_TIMEOUT_MILLIS) {
+            currentWebViewScrollY() >= minimumScrollY
+        }
+    }
+
+    private fun currentWebViewScrollY(): Int {
+        val scrollY = AtomicInteger()
+        onView(isAssignableFrom(WebView::class.java)).perform(
+            webViewAction("read the WebView root scroll position") { webView ->
+                scrollY.set(webView.scrollY)
+            },
+        )
+        return scrollY.get()
+    }
+
+    private fun performFastUpwardSwipe(testState: WebViewTestState): Int {
+        val countAtRelease = AtomicInteger()
+        onView(isAssignableFrom(WebView::class.java)).perform(
+            object : ViewAction {
+                override fun getConstraints(): Matcher<View> = isAssignableFrom(WebView::class.java)
+
+                override fun getDescription(): String = "perform a fast upward WebView swipe"
+
+                override fun perform(
+                    uiController: UiController,
+                    view: View,
+                ) {
+                    val downTime = SystemClock.uptimeMillis()
+                    val x = view.width / 2f
+                    val startY = view.height * 0.8f
+                    val endY = view.height * 0.2f
+                    dispatchTouch(view, downTime, downTime, MotionEvent.ACTION_DOWN, x, startY)
+                    uiController.loopMainThreadForAtLeast(SWIPE_MOVE_INTERVAL_MILLIS)
+                    repeat(SWIPE_MOVE_COUNT) { index ->
+                        val progress = (index + 1f) / SWIPE_MOVE_COUNT
+                        val y = startY + ((endY - startY) * progress)
+                        dispatchTouch(
+                            view,
+                            downTime,
+                            SystemClock.uptimeMillis(),
+                            MotionEvent.ACTION_MOVE,
+                            x,
+                            y,
+                        )
+                        uiController.loopMainThreadForAtLeast(SWIPE_MOVE_INTERVAL_MILLIS)
+                    }
+                    dispatchTouch(
+                        view,
+                        downTime,
+                        SystemClock.uptimeMillis(),
+                        MotionEvent.ACTION_UP,
+                        x,
+                        endY,
+                    )
+                    countAtRelease.set(testState.rootScrollCount.get())
+                    uiController.loopMainThreadForAtLeast(SWIPE_MOVE_INTERVAL_MILLIS)
+                }
+            },
+        )
+        return countAtRelease.get()
+    }
+
+    private fun dispatchWebViewConfigurationChanged() {
+        onView(isAssignableFrom(WebView::class.java)).perform(
+            webViewAction("dispatch WebView configuration change") { webView ->
+                webView.dispatchConfigurationChanged(Configuration(webView.resources.configuration))
+            },
+        )
+    }
+
+    private fun webViewAction(
+        description: String,
+        block: (WebView) -> Unit,
+    ): ViewAction = object : ViewAction {
+        override fun getConstraints(): Matcher<View> = isAssignableFrom(WebView::class.java)
+
+        override fun getDescription(): String = description
+
+        override fun perform(
+            uiController: UiController,
+            view: View,
+        ) {
+            block(view as WebView)
+        }
+    }
+
+    private fun dispatchTouch(
+        view: View,
+        downTime: Long,
+        eventTime: Long,
+        action: Int,
+        x: Float,
+        y: Float,
+    ) {
+        val event = MotionEvent.obtain(downTime, eventTime, action, x, y, 0)
+        try {
+            view.dispatchTouchEvent(event)
+        } finally {
+            event.recycle()
+        }
     }
 
     private fun waitForPage(
@@ -352,6 +540,7 @@ class SessionWebViewNavigationTest {
     private class WebViewTestState {
         val controller = AtomicReference<SessionWebViewController>()
         val page = AtomicReference(PageState())
+        val rootScrollCount = AtomicInteger()
     }
 
     private data class PageState(
@@ -367,5 +556,8 @@ class SessionWebViewNavigationTest {
 
     private companion object {
         const val PAGE_LOAD_TIMEOUT_MILLIS = 10_000L
+        const val FLING_TIMEOUT_MILLIS = 3_000L
+        const val SWIPE_MOVE_COUNT = 5
+        const val SWIPE_MOVE_INTERVAL_MILLIS = 16L
     }
 }

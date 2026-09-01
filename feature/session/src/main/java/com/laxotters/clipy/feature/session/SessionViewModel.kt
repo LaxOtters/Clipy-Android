@@ -193,6 +193,3 @@ private fun BottomSheetValue.toBottomSheetState(): BottomSheetState =
         BottomSheetValue.PEEK -> BottomSheetState.PEEK
         BottomSheetValue.EXPANDED -> BottomSheetState.EXPANDED
     }
-
-// root scroll 진행 상태를 idle로 되돌리기 전 기다리는 시간입니다.
-private const val ROOT_SCROLL_IDLE_DELAY_MILLIS = 150L
