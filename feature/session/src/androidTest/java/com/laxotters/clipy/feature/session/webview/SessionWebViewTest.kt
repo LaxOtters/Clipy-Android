@@ -65,7 +65,7 @@ class SessionWebViewTest {
     }
 
     @Test
-    fun regularLink_onClick_navigatesAndReturnsThroughCurrentHistory() {
+    fun regularLink_onClick_navigatesBackAndForwardThroughCurrentHistory() {
         dispatcher.respond(
             "/start",
             htmlResponse(
@@ -87,6 +87,28 @@ class SessionWebViewTest {
         waitForPage(testState, "/start")
         assertFalse(testState.page.get().canGoBack)
         assertTrue(testState.page.get().canGoForward)
+
+        goForward(testState)
+
+        waitForPage(testState, "/target")
+        assertTrue(testState.page.get().canGoBack)
+        assertFalse(testState.page.get().canGoForward)
+    }
+
+    @Test
+    fun currentPage_onReload_keepsUrlAndHistory() {
+        dispatcher.respond("/start", htmlResponse("Start"))
+        val testState = launchWebView("/start")
+        val pageLoadCount = testState.pageLoadCount.get()
+        val webViewState = currentWebViewState()
+
+        reload(testState)
+
+        composeRule.waitUntil(timeoutMillis = PAGE_LOAD_TIMEOUT_MILLIS) {
+            testState.pageLoadCount.get() > pageLoadCount &&
+                dispatcher.requestCount("/start") == 2
+        }
+        assertEquals(webViewState, currentWebViewState())
     }
 
     @Test
@@ -275,6 +297,11 @@ class SessionWebViewTest {
         val countAtRelease = performFastUpwardSwipe(testState)
 
         assertTrue(countAtRelease > 0)
+        val metrics = testState.rootScroll.get()
+        assertTrue(metrics.deltaY > 0)
+        assertTrue(metrics.scrollableDistance > 0)
+        assertTrue(metrics.viewportHeight > 0)
+        assertTrue(metrics.touchSlopPx > 0)
         composeRule.waitUntil(timeoutMillis = FLING_TIMEOUT_MILLIS) {
             testState.rootScrollCount.get() > countAtRelease
         }
@@ -317,15 +344,27 @@ class SessionWebViewTest {
                             canGoForward = canGoForward,
                         ),
                     )
+                    testState.pageLoadCount.incrementAndGet()
                 },
-                onRootScrolled = { _, _, _, _ ->
+                onRootScrolled = { deltaY, scrollableDistance, viewportHeight, touchSlopPx ->
                     testState.rootScrollCount.incrementAndGet()
+                    testState.rootScroll.set(
+                        ScrollMetrics(
+                            deltaY = deltaY,
+                            scrollableDistance = scrollableDistance,
+                            viewportHeight = viewportHeight,
+                            touchSlopPx = touchSlopPx,
+                        ),
+                    )
                 },
                 modifier = Modifier.fillMaxSize(),
             )
         }
 
         waitForPage(testState, path)
+        assertEquals(initialUrl, testState.page.get().url)
+        assertFalse(testState.page.get().canGoBack)
+        assertFalse(testState.page.get().canGoForward)
         return testState
     }
 
@@ -346,27 +385,29 @@ class SessionWebViewTest {
         composeRule.runOnIdle { testState.controller.get().goBack() }
     }
 
+    private fun goForward(testState: WebViewTestState) {
+        composeRule.runOnIdle { testState.controller.get().goForward() }
+    }
+
+    private fun reload(testState: WebViewTestState) {
+        composeRule.runOnIdle { testState.controller.get().reload() }
+    }
+
     private fun currentWebViewState(): CurrentWebViewState {
         val state = AtomicReference<CurrentWebViewState>()
 
         onView(isAssignableFrom(WebView::class.java)).perform(
-            object : ViewAction {
-                override fun getConstraints(): Matcher<View> = isAssignableFrom(WebView::class.java)
-
-                override fun getDescription(): String = "read the current WebView state"
-
-                override fun perform(
-                    uiController: UiController,
-                    view: View,
-                ) {
-                    val webView = view as WebView
-                    state.set(
-                        CurrentWebViewState(
-                            url = webView.url,
-                            canGoBack = webView.canGoBack(),
-                        ),
-                    )
-                }
+            webViewAction("read the current WebView state") { webView ->
+                val history = webView.copyBackForwardList()
+                state.set(
+                    CurrentWebViewState(
+                        url = webView.url,
+                        canGoBack = webView.canGoBack(),
+                        canGoForward = webView.canGoForward(),
+                        historySize = history.size,
+                        historyIndex = history.currentIndex,
+                    ),
+                )
             },
         )
 
@@ -498,6 +539,7 @@ class SessionWebViewTest {
     private fun htmlResponse(body: String): MockResponse =
         MockResponse.Builder()
             .addHeader("Content-Type", "text/html; charset=utf-8")
+            .addHeader("Cache-Control", "no-store")
             .body(
                 """
                 <!doctype html>
@@ -540,7 +582,9 @@ class SessionWebViewTest {
     private class WebViewTestState {
         val controller = AtomicReference<SessionWebViewController>()
         val page = AtomicReference(PageState())
+        val pageLoadCount = AtomicInteger()
         val rootScrollCount = AtomicInteger()
+        val rootScroll = AtomicReference(ScrollMetrics())
     }
 
     private data class PageState(
@@ -552,6 +596,16 @@ class SessionWebViewTest {
     private data class CurrentWebViewState(
         val url: String?,
         val canGoBack: Boolean,
+        val canGoForward: Boolean,
+        val historySize: Int,
+        val historyIndex: Int,
+    )
+
+    private data class ScrollMetrics(
+        val deltaY: Int = 0,
+        val scrollableDistance: Int = 0,
+        val viewportHeight: Int = 0,
+        val touchSlopPx: Int = 0,
     )
 
     private companion object {
