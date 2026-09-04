@@ -43,18 +43,34 @@ class JsDialogManagerTest {
     }
 
     @Test
-    fun requestFromActiveAction_isRejectedBeforeSlotIsCleared() {
+    fun requestFromActiveAction_isAcceptedAfterSlotIsCleared() {
         val manager = ClipyJsDialogManager()
         val request = alertRequest()
-        var nestedRequestAccepted = true
+        val nextRequest = alertRequest(title = "Second")
+        var nestedRequestAccepted = false
 
         manager.show(request)
         manager.complete(requireNotNull(manager.activeRequestEntry)) {
-            nestedRequestAccepted = manager.show(alertRequest(title = "Second"))
+            nestedRequestAccepted = manager.show(nextRequest)
         }
 
-        assertFalse(nestedRequestAccepted)
-        assertNull(manager.activeRequestEntry)
+        assertTrue(nestedRequestAccepted)
+        assertSame(nextRequest, manager.activeRequestEntry?.request)
+    }
+
+    @Test
+    fun repeatedActionsForSameRequest_onlyFirstActionRuns() {
+        val manager = ClipyJsDialogManager()
+        var primaryActionCount = 0
+        var secondaryActionCount = 0
+
+        manager.show(alertRequest())
+        val requestEntry = requireNotNull(manager.activeRequestEntry)
+        manager.complete(requestEntry) { primaryActionCount++ }
+        manager.complete(requestEntry) { secondaryActionCount++ }
+
+        assertEquals(1, primaryActionCount)
+        assertEquals(0, secondaryActionCount)
     }
 
     @Test

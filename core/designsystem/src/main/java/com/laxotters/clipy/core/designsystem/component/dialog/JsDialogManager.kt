@@ -29,7 +29,7 @@ class ClipyJsDialogManager internal constructor() {
         return true
     }
 
-    /** 현재 요청만 완료하고, action 실행 뒤 표시 슬롯을 비웁니다. */
+    /** 현재 사용자 응답을 완료합니다. 응답이 만든 후속 요청을 받을 수 있도록 action 전에 슬롯을 비웁니다. */
     @MainThread
     internal fun complete(
         requestEntry: JsDialogRequestEntry,
@@ -40,13 +40,8 @@ class ClipyJsDialogManager internal constructor() {
             return
         }
 
-        try {
-            action()
-        } finally {
-            if (activeRequestEntry === requestEntry) {
-                activeRequestEntry = null
-            }
-        }
+        activeRequestEntry = null
+        action()
     }
 }
 
@@ -55,7 +50,7 @@ internal class JsDialogRequestEntry(
     val request: JsDialogRequest,
 )
 
-/** Manager가 수락한 현재 JS Dialog 요청을 표시하고, action 실행 뒤 요청을 완료합니다. */
+/** Manager가 수락한 현재 JS Dialog 요청을 표시하고, 사용자 응답을 한 번만 완료합니다. */
 @Composable
 fun ClipyJsDialogHost(
     manager: ClipyJsDialogManager,
