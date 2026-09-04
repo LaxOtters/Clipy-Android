@@ -52,13 +52,13 @@ import com.laxotters.clipy.core.designsystem.component.button.model.ButtonType
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 
 /** 앱 Dialog의 기본·오류 시각 타입입니다. */
-enum class ClipyDialogStyle {
+enum class DialogStyle {
     Default,
     Error,
 }
 
 /** JavaScript Dialog의 화면 상태와 action을 정의합니다. */
-sealed interface ClipyJsDialogState {
+sealed interface JsDialogState {
     val title: String
     val description: String
 
@@ -66,14 +66,14 @@ sealed interface ClipyJsDialogState {
         override val title: String,
         override val description: String,
         val confirmAction: ClipyTextAction,
-    ) : ClipyJsDialogState
+    ) : JsDialogState
 
     data class Confirm(
         override val title: String,
         override val description: String,
         val confirmAction: ClipyTextAction,
         val cancelAction: ClipyTextAction,
-    ) : ClipyJsDialogState
+    ) : JsDialogState
 
     data class Prompt(
         override val title: String,
@@ -81,7 +81,7 @@ sealed interface ClipyJsDialogState {
         val confirmAction: ClipyTextInputAction,
         val initialValue: String,
         val cancelAction: ClipyTextAction,
-    ) : ClipyJsDialogState
+    ) : JsDialogState
 }
 
 /** primary action 하나를 제공하는 앱 Dialog입니다. */
@@ -91,7 +91,7 @@ fun ClipySingleDialog(
     description: String,
     primaryAction: ClipyTextAction,
     modifier: Modifier = Modifier,
-    style: ClipyDialogStyle = ClipyDialogStyle.Default,
+    style: DialogStyle = DialogStyle.Default,
 ) {
     ClipyDialogWindow(
         modifier = modifier,
@@ -113,7 +113,7 @@ fun ClipyDualDialog(
     primaryAction: ClipyTextAction,
     secondaryAction: ClipyTextAction,
     modifier: Modifier = Modifier,
-    style: ClipyDialogStyle = ClipyDialogStyle.Default,
+    style: DialogStyle = DialogStyle.Default,
 ) {
     ClipyDialogWindow(
         modifier = modifier,
@@ -136,7 +136,7 @@ fun ClipyDualDialog(
 @Composable
 fun ClipyJsDialog(
     source: String,
-    state: ClipyJsDialogState,
+    state: JsDialogState,
     modifier: Modifier = Modifier,
 ) {
     ClipyDialogWindow(
@@ -205,7 +205,7 @@ private fun ColumnScope.DialogContent(
     description: String,
     primaryAction: ClipyTextAction,
     secondaryAction: ClipyTextAction? = null,
-    style: ClipyDialogStyle = ClipyDialogStyle.Default,
+    style: DialogStyle = DialogStyle.Default,
 ) {
     DialogTextContent(
         title = title,
@@ -216,13 +216,13 @@ private fun ColumnScope.DialogContent(
                 fill = false,
             )
             .then(
-                if (style == ClipyDialogStyle.Error) {
+                if (style == DialogStyle.Error) {
                     Modifier
                 } else {
                     Modifier.padding(top = DialogDefaults.headingTopPadding)
                 },
             ),
-        showErrorIcon = style == ClipyDialogStyle.Error,
+        showErrorIcon = style == DialogStyle.Error,
     )
     DialogActions(
         primaryAction = primaryAction,
@@ -314,9 +314,9 @@ internal fun DialogTextContent(
 @Composable
 private fun ColumnScope.JsDialogContent(
     source: String,
-    state: ClipyJsDialogState,
+    state: JsDialogState,
 ) {
-    val promptInitialValue = (state as? ClipyJsDialogState.Prompt)
+    val promptInitialValue = (state as? JsDialogState.Prompt)
         ?.initialValue
         .orEmpty()
     var promptValue by rememberSaveable(
@@ -347,7 +347,7 @@ private fun ColumnScope.JsDialogContent(
 @Composable
 private fun JsDialogBody(
     source: String,
-    state: ClipyJsDialogState,
+    state: JsDialogState,
     promptValue: String,
     onPromptValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -361,7 +361,7 @@ private fun JsDialogBody(
                 fill = false,
             )
             .then(
-                if (state is ClipyJsDialogState.Alert) {
+                if (state is JsDialogState.Alert) {
                     Modifier
                 } else {
                     Modifier.padding(top = DialogDefaults.headingTopPadding)
@@ -391,13 +391,13 @@ private fun JsDialogBody(
             title = state.title,
             description = state.description,
             modifier = messageModifier,
-            textAlign = if (state is ClipyJsDialogState.Prompt) {
+            textAlign = if (state is JsDialogState.Prompt) {
                 TextAlign.Start
             } else {
                 TextAlign.Center
             },
         )
-        if (state is ClipyJsDialogState.Prompt) {
+        if (state is JsDialogState.Prompt) {
             Spacer(modifier = Modifier.height(DialogDefaults.textSpacing))
             JsPromptInput(
                 value = promptValue,
@@ -487,22 +487,22 @@ private fun JsPromptInput(
 
 @Composable
 private fun JsDialogActions(
-    state: ClipyJsDialogState,
+    state: JsDialogState,
     promptValue: String,
 ) {
     val (primaryLabel, onPrimaryClick) = when (state) {
-        is ClipyJsDialogState.Alert -> state.confirmAction.label to state.confirmAction.onClick
-        is ClipyJsDialogState.Confirm -> state.confirmAction.label to state.confirmAction.onClick
-        is ClipyJsDialogState.Prompt -> {
+        is JsDialogState.Alert -> state.confirmAction.label to state.confirmAction.onClick
+        is JsDialogState.Confirm -> state.confirmAction.label to state.confirmAction.onClick
+        is JsDialogState.Prompt -> {
             state.confirmAction.label to {
                 state.confirmAction.onClick(promptValue)
             }
         }
     }
     val secondaryAction = when (state) {
-        is ClipyJsDialogState.Alert -> null
-        is ClipyJsDialogState.Confirm -> state.cancelAction
-        is ClipyJsDialogState.Prompt -> state.cancelAction
+        is JsDialogState.Alert -> null
+        is JsDialogState.Confirm -> state.cancelAction
+        is JsDialogState.Prompt -> state.cancelAction
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -581,11 +581,11 @@ private sealed interface DialogPreview {
         val description: String,
         val primaryAction: ClipyTextAction,
         val secondaryAction: ClipyTextAction? = null,
-        val style: ClipyDialogStyle = ClipyDialogStyle.Default,
+        val style: DialogStyle = DialogStyle.Default,
     ) : DialogPreview
 
     data class JavaScript(
-        val state: ClipyJsDialogState,
+        val state: JsDialogState,
     ) : DialogPreview
 }
 
@@ -609,7 +609,7 @@ private class DialogPreviewProvider : PreviewParameterProvider<DialogPreview> {
             title = "연결할 수 없습니다",
             description = "잠시 후 다시 시도해주세요.",
             primaryAction = PreviewConfirmAction,
-            style = ClipyDialogStyle.Error,
+            style = DialogStyle.Error,
         ),
         DialogPreview.App(
             title = "항목을 삭제할 수 없습니다",
@@ -619,7 +619,7 @@ private class DialogPreviewProvider : PreviewParameterProvider<DialogPreview> {
                 onClick = {},
             ),
             secondaryAction = PreviewCancelAction,
-            style = ClipyDialogStyle.Error,
+            style = DialogStyle.Error,
         ),
         DialogPreview.App(
             title = "이용 안내",
@@ -627,14 +627,14 @@ private class DialogPreviewProvider : PreviewParameterProvider<DialogPreview> {
             primaryAction = PreviewConfirmAction,
         ),
         DialogPreview.JavaScript(
-            state = ClipyJsDialogState.Alert(
+            state = JsDialogState.Alert(
                 title = "알림",
                 description = "웹사이트에서 메시지를 보냈습니다.",
                 confirmAction = PreviewConfirmAction,
             ),
         ),
         DialogPreview.JavaScript(
-            state = ClipyJsDialogState.Confirm(
+            state = JsDialogState.Confirm(
                 title = "계속 진행할까요?",
                 description = "웹사이트 요청을 확인해주세요.",
                 confirmAction = PreviewConfirmAction,
@@ -642,7 +642,7 @@ private class DialogPreviewProvider : PreviewParameterProvider<DialogPreview> {
             ),
         ),
         DialogPreview.JavaScript(
-            state = ClipyJsDialogState.Prompt(
+            state = JsDialogState.Prompt(
                 title = "이름을 입력해주세요",
                 description = "웹사이트에 전달할 값을 입력하세요.",
                 confirmAction = PreviewPromptConfirmAction,
@@ -651,7 +651,7 @@ private class DialogPreviewProvider : PreviewParameterProvider<DialogPreview> {
             ),
         ),
         DialogPreview.JavaScript(
-            state = ClipyJsDialogState.Prompt(
+            state = JsDialogState.Prompt(
                 title = "정보를 입력해주세요",
                 description = LongDialogDescription,
                 confirmAction = PreviewPromptConfirmAction,

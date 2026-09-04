@@ -19,11 +19,11 @@ import androidx.compose.ui.unit.dp
 import androidx.test.espresso.Espresso.pressBackUnconditionally
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.laxotters.clipy.core.designsystem.component.ClipyTextInputAction
-import com.laxotters.clipy.core.designsystem.component.dialog.ClipyDialogStyle
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipyDualDialog
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialog
-import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogState
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipySingleDialog
+import com.laxotters.clipy.core.designsystem.component.dialog.DialogStyle
+import com.laxotters.clipy.core.designsystem.component.dialog.JsDialogState
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -36,7 +36,7 @@ class DialogUiTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun clipyDialog_backAndOutsideTapDoNotDismiss() {
+    fun dialog_backAndOutsideTapDoNotDismiss() {
         composeTestRule.setContent {
             ClipyTheme {
                 ClipySingleDialog(
@@ -68,7 +68,7 @@ class DialogUiTest {
     }
 
     @Test
-    fun clipyDialog_twoActionsInvokeTheirCallbacks() {
+    fun dialog_twoActionsInvokeTheirCallbacks() {
         var cancelCount = 0
         var confirmCount = 0
 
@@ -105,7 +105,7 @@ class DialogUiTest {
     }
 
     @Test
-    fun clipyErrorDialog_supportsTwoActions() {
+    fun errorDialog_supportsTwoActions() {
         var cancelCount = 0
         var retryCount = 0
 
@@ -122,7 +122,7 @@ class DialogUiTest {
                         label = "Cancel",
                         onClick = { cancelCount++ },
                     ),
-                    style = ClipyDialogStyle.Error,
+                    style = DialogStyle.Error,
                 )
             }
         }
@@ -150,7 +150,7 @@ class DialogUiTest {
             ClipyTheme {
                 ClipyJsDialog(
                     source = "Request from example.com",
-                    state = ClipyJsDialogState.Alert(
+                    state = JsDialogState.Alert(
                         title = "Notice",
                         description = "The website sent a message.",
                         confirmAction = ClipyTextAction(
@@ -179,7 +179,7 @@ class DialogUiTest {
             ClipyTheme {
                 ClipyJsDialog(
                     source = "Request from example.com",
-                    state = ClipyJsDialogState.Alert(
+                    state = JsDialogState.Alert(
                         title = "Notice",
                         description = "The website sent a message.",
                         confirmAction = ClipyTextAction(
@@ -217,7 +217,7 @@ class DialogUiTest {
             ClipyTheme {
                 ClipyJsDialog(
                     source = "Request from example.com",
-                    state = ClipyJsDialogState.Confirm(
+                    state = JsDialogState.Confirm(
                         title = "Continue?",
                         description = "Please confirm the request.",
                         confirmAction = ClipyTextAction(
@@ -256,7 +256,7 @@ class DialogUiTest {
             ClipyTheme {
                 ClipyJsDialog(
                     source = "Request from example.com",
-                    state = ClipyJsDialogState.Prompt(
+                    state = JsDialogState.Prompt(
                         title = "Enter a name",
                         description = "This value is sent to the website.",
                         confirmAction = ClipyTextInputAction(
@@ -286,7 +286,7 @@ class DialogUiTest {
     }
 
     @Test
-    fun clipyDialog_longDescriptionScrollsAndKeepsActionVisible() {
+    fun dialog_longDescriptionScrollsAndKeepsActionVisible() {
         var confirmCount = 0
 
         composeTestRule.setContent {
@@ -321,7 +321,7 @@ class DialogUiTest {
             ClipyTheme {
                 ClipyJsDialog(
                     source = "Request from example.com",
-                    state = ClipyJsDialogState.Prompt(
+                    state = JsDialogState.Prompt(
                         title = "Enter a name",
                         description = "Long description\n".repeat(40),
                         confirmAction = ClipyTextInputAction(

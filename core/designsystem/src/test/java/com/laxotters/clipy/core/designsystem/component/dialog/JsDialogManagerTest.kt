@@ -8,7 +8,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ClipyJsDialogManagerTest {
+class JsDialogManagerTest {
     @Test
     fun firstRequest_isAccepted() {
         val manager = ClipyJsDialogManager()
@@ -102,8 +102,8 @@ class ClipyJsDialogManagerTest {
         assertSame(activeRequestEntry, manager.activeRequestEntry)
     }
 
-    private fun alertRequest(title: String = "First"): ClipyJsDialogRequest.Alert =
-        ClipyJsDialogRequest.Alert(
+    private fun alertRequest(title: String = "First"): JsDialogRequest.Alert =
+        JsDialogRequest.Alert(
             source = "Request from example.com",
             title = title,
             description = "Description",

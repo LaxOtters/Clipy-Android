@@ -20,7 +20,7 @@ class ClipyJsDialogManager internal constructor() {
 
     /** 표시 중인 요청이 없을 때만 요청을 수락하고, 수락 여부를 반환합니다. */
     @MainThread
-    fun show(request: ClipyJsDialogRequest): Boolean {
+    fun show(request: JsDialogRequest): Boolean {
         if (activeRequestEntry != null) {
             return false
         }
@@ -52,7 +52,7 @@ class ClipyJsDialogManager internal constructor() {
 
 /** Host가 표시하는 JS Dialog 요청 한 건의 상태와 action 수명을 구분합니다. */
 internal class JsDialogRequestEntry(
-    val request: ClipyJsDialogRequest,
+    val request: JsDialogRequest,
 )
 
 /** Manager가 수락한 현재 JS Dialog 요청을 표시하고, action 실행 뒤 요청을 완료합니다. */
@@ -67,10 +67,10 @@ fun ClipyJsDialogHost(
     // 요청이 바뀌면 Dialog 내부 입력값과 스크롤 상태를 새로 생성합니다.
     key(requestEntry) {
         when (request) {
-            is ClipyJsDialogRequest.Alert -> {
+            is JsDialogRequest.Alert -> {
                 ClipyJsDialog(
                     source = request.source,
-                    state = ClipyJsDialogState.Alert(
+                    state = JsDialogState.Alert(
                         title = request.title,
                         description = request.description,
                         confirmAction = request.confirmAction.withCompletion(
@@ -82,10 +82,10 @@ fun ClipyJsDialogHost(
                 )
             }
 
-            is ClipyJsDialogRequest.Confirm -> {
+            is JsDialogRequest.Confirm -> {
                 ClipyJsDialog(
                     source = request.source,
-                    state = ClipyJsDialogState.Confirm(
+                    state = JsDialogState.Confirm(
                         title = request.title,
                         description = request.description,
                         confirmAction = request.confirmAction.withCompletion(
@@ -101,10 +101,10 @@ fun ClipyJsDialogHost(
                 )
             }
 
-            is ClipyJsDialogRequest.Prompt -> {
+            is JsDialogRequest.Prompt -> {
                 ClipyJsDialog(
                     source = request.source,
-                    state = ClipyJsDialogState.Prompt(
+                    state = JsDialogState.Prompt(
                         title = request.title,
                         description = request.description,
                         initialValue = request.initialValue,
@@ -130,7 +130,7 @@ fun rememberClipyJsDialogManager(): ClipyJsDialogManager = remember {
 }
 
 /** JS Dialog에 표시할 콘텐츠와 웹 요청에 돌려줄 action을 정의합니다. */
-sealed interface ClipyJsDialogRequest {
+sealed interface JsDialogRequest {
     val source: String
     val title: String
     val description: String
@@ -140,7 +140,7 @@ sealed interface ClipyJsDialogRequest {
         override val title: String,
         override val description: String,
         val confirmAction: ClipyTextAction,
-    ) : ClipyJsDialogRequest
+    ) : JsDialogRequest
 
     data class Confirm(
         override val source: String,
@@ -148,7 +148,7 @@ sealed interface ClipyJsDialogRequest {
         override val description: String,
         val confirmAction: ClipyTextAction,
         val cancelAction: ClipyTextAction,
-    ) : ClipyJsDialogRequest
+    ) : JsDialogRequest
 
     data class Prompt(
         override val source: String,
@@ -157,7 +157,7 @@ sealed interface ClipyJsDialogRequest {
         val initialValue: String,
         val confirmAction: ClipyTextInputAction,
         val cancelAction: ClipyTextAction,
-    ) : ClipyJsDialogRequest
+    ) : JsDialogRequest
 }
 
 private fun ClipyTextAction.withCompletion(
