@@ -87,6 +87,53 @@ class JsDialogManagerTest {
     }
 
     @Test
+    fun cancelActive_invokesCancellationAndClearsRequest() {
+        val manager = ClipyJsDialogManager()
+        var cancelCount = 0
+        manager.show(alertRequest(onCancel = { cancelCount++ }))
+
+        manager.cancelActive()
+        manager.cancelActive()
+
+        assertEquals(1, cancelCount)
+        assertNull(manager.activeRequestEntry)
+    }
+
+    @Test
+    fun requestFromLifecycleCancellation_isRejectedUntilCancellationCompletes() {
+        val manager = ClipyJsDialogManager()
+        val nextRequest = alertRequest(title = "Second")
+        var nestedRequestAccepted = true
+        manager.show(
+            alertRequest(
+                onCancel = {
+                    nestedRequestAccepted = manager.show(nextRequest)
+                },
+            ),
+        )
+
+        manager.cancelActive()
+
+        assertFalse(nestedRequestAccepted)
+        assertNull(manager.activeRequestEntry)
+    }
+
+    @Test
+    fun cancelActive_clearsRequestWhenCancellationThrows() {
+        val manager = ClipyJsDialogManager()
+        manager.show(alertRequest(onCancel = { error("Failed cancellation") }))
+
+        runCatching(manager::cancelActive)
+
+        assertNull(manager.activeRequestEntry)
+    }
+
+    @Test
+    fun cancelActive_withoutActiveRequest_doesNothing() {
+        ClipyJsDialogManager().cancelActive()
+    }
+
+    @Test
     fun sameRequest_isWrappedInNewEntryForEachAcceptedShow() {
         val manager = ClipyJsDialogManager()
         val request = alertRequest()
@@ -118,7 +165,10 @@ class JsDialogManagerTest {
         assertSame(activeRequestEntry, manager.activeRequestEntry)
     }
 
-    private fun alertRequest(title: String = "First"): JsDialogRequest.Alert =
+    private fun alertRequest(
+        title: String = "First",
+        onCancel: () -> Unit = {},
+    ): JsDialogRequest.Alert =
         JsDialogRequest.Alert(
             source = "Request from example.com",
             title = title,
@@ -127,5 +177,52 @@ class JsDialogManagerTest {
                 label = "Confirm",
                 onClick = {},
             ),
+            onCancel = onCancel,
         )
+
+    @Test
+    fun cancellation_rejectsReentrantCancelAndResponse() {
+        val manager = ClipyJsDialogManager()
+        var cancellations = 0
+        var responses = 0
+        manager.show(
+            alertRequest(
+                onCancel = {
+                    cancellations++
+                    manager.cancelActive()
+                    manager.complete(requireNotNull(manager.activeRequestEntry)) { responses++ }
+                },
+            ),
+        )
+
+        manager.cancelActive()
+
+        assertEquals(1, cancellations)
+        assertEquals(0, responses)
+        assertNull(manager.activeRequestEntry)
+        assertTrue(manager.show(alertRequest()))
+    }
+
+    @Test
+    fun targetedCancellation_ignoresEqualButDifferentRequest() {
+        val manager = ClipyJsDialogManager()
+        val request = alertRequest()
+        manager.show(request)
+
+        manager.cancelActive(request.copy())
+
+        assertSame(request, manager.activeRequestEntry?.request)
+        manager.cancelActive(request)
+        assertNull(manager.activeRequestEntry)
+    }
+
+    @Test
+    fun cancellationFailure_allowsNextRequest() {
+        val manager = ClipyJsDialogManager()
+        manager.show(alertRequest(onCancel = { error("cancel failed") }))
+
+        runCatching(manager::cancelActive)
+
+        assertTrue(manager.show(alertRequest()))
+    }
 }
