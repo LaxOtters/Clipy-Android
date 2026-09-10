@@ -1,7 +1,9 @@
-package com.laxotters.clipy.feature.session.webview
+package com.laxotters.clipy.feature.session.webview.client
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.laxotters.clipy.feature.session.webview.PageInfo
+import com.laxotters.clipy.feature.session.webview.SessionWebViewCallbacks
 
 internal class SessionWebViewClient(
     private val callbacks: SessionWebViewCallbacks,

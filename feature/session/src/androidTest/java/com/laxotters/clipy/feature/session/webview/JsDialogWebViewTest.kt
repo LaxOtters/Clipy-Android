@@ -22,6 +22,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogHost
 import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
+import com.laxotters.clipy.feature.session.webview.client.SessionWebChromeClient
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import mockwebserver3.Dispatcher

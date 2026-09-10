@@ -1,9 +1,10 @@
-package com.laxotters.clipy.feature.session.webview
+package com.laxotters.clipy.feature.session.webview.client
 
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.WebChromeClient
 import android.webkit.WebView
+import com.laxotters.clipy.feature.session.webview.SessionWebDialogCoordinator
 
 /** WebView JavaScript 요청을 Session Dialog coordinator에 전달합니다. */
 internal class SessionWebChromeClient(
