@@ -39,6 +39,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetDefaults.HeaderHeight
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetLayout
+import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogHost
+import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogManager
+import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.webview.SessionWebView
@@ -53,6 +56,7 @@ fun SessionRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val webViewController = rememberSessionWebViewController()
+    val jsDialogManager = key(state.sessionId) { rememberClipyJsDialogManager() }
 
     BackHandler { viewModel.dispatch(SessionUiEvent.SystemBackPressed) }
 
@@ -79,7 +83,10 @@ fun SessionRoute(
         SessionWebViewHost(
             sessionId = state.sessionId,
             initialUrl = state.initialUrl,
-            controller = webViewController,
+            dependencies = SessionWebViewDependencies(
+                controller = webViewController,
+                dialogManager = jsDialogManager,
+            ),
             onPageLoaded = viewModel::dispatch,
             onRootScrolled = { deltaY, scrollableDistance, viewportHeight, touchSlopPx ->
                 viewModel.dispatch(
@@ -95,6 +102,8 @@ fun SessionRoute(
         )
     }
 
+    ClipyJsDialogHost(manager = jsDialogManager)
+
     LaunchedEffect(viewModel.effect) {
         viewModel.effect.collect { effect ->
             when (effect) {
@@ -109,7 +118,7 @@ fun SessionRoute(
 private fun SessionWebViewHost(
     sessionId: String,
     initialUrl: String?,
-    controller: SessionWebViewController,
+    dependencies: SessionWebViewDependencies,
     onPageLoaded: (SessionUiEvent.PageLoaded) -> Unit,
     onRootScrolled: (deltaY: Int, scrollableDistance: Int, viewportHeight: Int, touchSlopPx: Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -118,7 +127,8 @@ private fun SessionWebViewHost(
     key(sessionId) {
         SessionWebView(
             url = initialUrl,
-            controller = controller,
+            controller = dependencies.controller,
+            dialogManager = dependencies.dialogManager,
             onPageStateChanged = { pageUrl, canGoBack, canGoForward ->
                 onPageLoaded(
                     SessionUiEvent.PageLoaded(
@@ -134,6 +144,11 @@ private fun SessionWebViewHost(
         )
     }
 }
+
+private data class SessionWebViewDependencies(
+    val controller: SessionWebViewController,
+    val dialogManager: ClipyJsDialogManager,
+)
 
 private data class ScreenActions(
     val topBarActions: TopBarActions,

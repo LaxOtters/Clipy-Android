@@ -15,21 +15,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogManager
 import com.laxotters.clipy.feature.session.ROOT_SCROLL_IDLE_DELAY_MILLIS
 
 /**
  * Session의 단일 Main WebView를 렌더링하고 페이지·방문 기록·root scroll 상태를 호출자에게 전달합니다.
+ * 실제 WebView release 시 대기 중인 JavaScript Dialog 결과를 취소합니다.
  */
 @Composable
-fun SessionWebView(
+internal fun SessionWebView(
     url: String?,
     controller: SessionWebViewController,
+    dialogManager: ClipyJsDialogManager,
     onPageStateChanged: (url: String, canGoBack: Boolean, canGoForward: Boolean) -> Unit,
     onRootScrolled: (deltaY: Int, scrollableDistance: Int, viewportHeight: Int, touchSlopPx: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val currentOnPageStateChanged by rememberUpdatedState(onPageStateChanged)
     val currentOnRootScrolled by rememberUpdatedState(onRootScrolled)
+    val dialogStrings = sessionWebDialogStrings()
     val loadState = remember { SessionWebViewLoadState() }
     val callbacks = remember {
         SessionWebViewCallbacks(
@@ -54,12 +58,17 @@ fun SessionWebView(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            SessionWebViewContainer(context).apply {
-                webView.configureSessionWebView(callbacks)
+            val coordinator = SessionWebDialogCoordinator(dialogManager, dialogStrings)
+            SessionWebViewContainer(context, coordinator, controller).apply {
+                webView.configureSessionWebView(
+                    callbacks = callbacks,
+                    dialogCoordinator = coordinator,
+                )
                 webView.onRootScrolled = callbacks.onRootScrolled
             }
         },
         update = { container ->
+            container.dialogCoordinator.updateStrings(dialogStrings)
             controller.attach(container.webView)
 
             // 전달된 URL이 바뀔 때만 새 탐색을 시작해 기존 WebView 상태를 유지합니다.
@@ -69,11 +78,7 @@ fun SessionWebView(
             }
         },
         onRelease = { container ->
-            controller.detach(container.webView)
-            container.webView.onRootScrolled = null
-            container.webView.release()
-            container.removeAllViews()
-            container.webView.destroy()
+            container.releaseAction.release()
         },
     )
 }
@@ -85,16 +90,35 @@ private class SessionWebViewLoadState {
 @SuppressLint("SetJavaScriptEnabled")
 private fun WebView.configureSessionWebView(
     callbacks: SessionWebViewCallbacks,
+    dialogCoordinator: SessionWebDialogCoordinator,
 ) {
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
     settings.setSupportMultipleWindows(false)
     settings.javaScriptCanOpenWindowsAutomatically = false
     webViewClient = SessionWebViewClient(callbacks)
+    webChromeClient = SessionWebChromeClient(dialogCoordinator)
 }
 
-private class SessionWebViewContainer(context: Context) : FrameLayout(context) {
+private class SessionWebViewContainer(
+    context: Context,
+    val dialogCoordinator: SessionWebDialogCoordinator,
+    controller: SessionWebViewController,
+) : FrameLayout(context) {
     val webView: RootScrollWebView = RootScrollWebView(context)
+    val releaseAction = SessionWebViewRelease(
+        closeDialog = dialogCoordinator::close,
+        detachController = { controller.detach(webView) },
+        releaseCallbacks = {
+            webView.onRootScrolled = null
+            webView.release()
+        },
+        removeFromParent = { removeView(webView) },
+        destroy = {
+            check(webView.parent == null) { "WebView must be detached before destroy" }
+            webView.destroy()
+        },
+    )
 
     init {
         addView(

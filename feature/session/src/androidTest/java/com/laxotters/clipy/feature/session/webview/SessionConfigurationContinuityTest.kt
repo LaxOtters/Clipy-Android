@@ -11,7 +11,11 @@ import android.webkit.WebView
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.UiController
@@ -28,6 +32,8 @@ import androidx.test.filters.LargeTest
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
+import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogHost
+import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
 import com.laxotters.clipy.core.navigation.Route
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.SessionTopBarState
@@ -209,6 +215,121 @@ class SessionConfigurationContinuityTest {
         )
     }
 
+    @Test
+    fun configurationChanges_keepJavaScriptDialogAndPendingResult() {
+        val pageState = launchWebView("about:blank")
+        val webView = currentWebView()
+        startJavascript(
+            "alert('Configuration alert'); document.title = 'dialog-confirmed'",
+        )
+        assertDialogDisplayed()
+
+        val activityIdentity = System.identityHashCode(composeRule.activity)
+        val originalConfiguration = Configuration(composeRule.activity.resources.configuration)
+
+        verifyDialogConfigurationRoundTrip(
+            activityIdentity = activityIdentity,
+            webView = webView,
+            change = ::changeOrientation,
+            changed = {
+                composeRule.activity.resources.configuration.orientation != originalOrientation
+            },
+            restore = ::restoreOrientation,
+            restored = {
+                composeRule.activity.resources.configuration.orientation == originalOrientation
+            },
+        )
+
+        verifyDialogConfigurationRoundTrip(
+            activityIdentity = activityIdentity,
+            webView = webView,
+            change = { displaySettings.setWindowSize(displaySettings.changedWindowSize) },
+            changed = {
+                composeRule.activity.resources.configuration.screenWidthDp !=
+                    originalConfiguration.screenWidthDp
+            },
+            restore = displaySettings::restoreWindowSize,
+            restored = {
+                composeRule.activity.resources.configuration.screenWidthDp ==
+                    originalConfiguration.screenWidthDp
+            },
+        )
+
+        val originalUiMode = originalConfiguration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        verifyDialogConfigurationRoundTrip(
+            activityIdentity = activityIdentity,
+            webView = webView,
+            change = ::changeNightMode,
+            changed = {
+                composeRule.activity.resources.configuration.uiMode and
+                    Configuration.UI_MODE_NIGHT_MASK != originalUiMode
+            },
+            restore = { uiModeManager.setApplicationNightMode(originalNightMode) },
+            restored = {
+                composeRule.activity.resources.configuration.uiMode and
+                    Configuration.UI_MODE_NIGHT_MASK == originalUiMode
+            },
+        )
+
+        val targetFontScale = if (originalConfiguration.fontScale < 1.1f) 1.15f else 1f
+        verifyDialogConfigurationRoundTrip(
+            activityIdentity = activityIdentity,
+            webView = webView,
+            change = { displaySettings.setFontScale(targetFontScale) },
+            changed = {
+                composeRule.activity.resources.configuration.fontScale.isCloseTo(targetFontScale)
+            },
+            restore = displaySettings::restoreFontScale,
+            restored = {
+                composeRule.activity.resources.configuration.fontScale
+                    .isCloseTo(originalConfiguration.fontScale)
+            },
+        )
+
+        val targetFontWeightAdjustment = if (originalConfiguration.fontWeightAdjustment == 300) {
+            0
+        } else {
+            300
+        }
+        verifyDialogConfigurationRoundTrip(
+            activityIdentity = activityIdentity,
+            webView = webView,
+            change = {
+                displaySettings.setFontWeightAdjustment(targetFontWeightAdjustment)
+            },
+            changed = {
+                composeRule.activity.resources.configuration.fontWeightAdjustment ==
+                    targetFontWeightAdjustment
+            },
+            restore = displaySettings::restoreFontWeightAdjustment,
+            restored = {
+                composeRule.activity.resources.configuration.fontWeightAdjustment ==
+                    originalConfiguration.fontWeightAdjustment
+            },
+        )
+
+        verifyDialogConfigurationRoundTrip(
+            activityIdentity = activityIdentity,
+            webView = webView,
+            change = { displaySettings.setDensity(displaySettings.changedDensity) },
+            changed = {
+                composeRule.activity.resources.configuration.densityDpi ==
+                    displaySettings.changedDensity
+            },
+            restore = displaySettings::restoreDensity,
+            restored = {
+                composeRule.activity.resources.configuration.densityDpi ==
+                    originalConfiguration.densityDpi
+            },
+        )
+
+        composeRule.onNodeWithText("Confirm").performClick()
+        composeRule.waitUntil(timeoutMillis = PAGE_LOAD_TIMEOUT_MILLIS) {
+            currentWebViewTitle(webView) == "dialog-confirmed"
+        }
+        assertTrue(pageState.get().url.isNotEmpty())
+    }
+
     private fun launchWebView(initialUrl: String): AtomicReference<PageState> {
         val pageState = AtomicReference(PageState())
         sessionViewModel = SessionViewModel(Route.Session(CONFIGURATION_TEST_SESSION_ID))
@@ -216,9 +337,12 @@ class SessionConfigurationContinuityTest {
         composeRule.activityRule.scenario.onActivity { activity ->
             activity.setContent {
                 val controller = rememberSessionWebViewController()
+                val dialogManager = rememberClipyJsDialogManager()
+
                 SessionWebView(
                     url = initialUrl,
                     controller = controller,
+                    dialogManager = dialogManager,
                     onPageStateChanged = { url, canGoBack, canGoForward ->
                         pageState.set(PageState(url = url))
                         sessionViewModel.dispatch(
@@ -242,6 +366,7 @@ class SessionConfigurationContinuityTest {
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
+                ClipyJsDialogHost(manager = dialogManager)
             }
         }
 
@@ -360,6 +485,49 @@ class SessionConfigurationContinuityTest {
         )
     }
 
+    private fun verifyDialogConfigurationRoundTrip(
+        activityIdentity: Int,
+        webView: WebView,
+        change: () -> Unit,
+        changed: () -> Boolean,
+        restore: () -> Unit,
+        restored: () -> Boolean,
+    ) {
+        try {
+            change()
+            waitForConfiguration(changed)
+            assertDialogContinuity(activityIdentity, webView)
+        } finally {
+            restore()
+            waitForConfiguration(restored)
+        }
+
+        assertDialogContinuity(activityIdentity, webView)
+    }
+
+    private fun assertDialogContinuity(
+        activityIdentity: Int,
+        webView: WebView,
+    ) {
+        assertEquals(activityIdentity, System.identityHashCode(composeRule.activity))
+        composeRule.runOnIdle {
+            assertTrue(webView.isAttachedToWindow)
+        }
+        assertDialogExists()
+    }
+
+    private fun assertDialogExists() {
+        composeRule.onNodeWithText("Message from this site").fetchSemanticsNode()
+        composeRule.onNodeWithText("Configuration alert").fetchSemanticsNode()
+        composeRule.onNodeWithText("Confirm").fetchSemanticsNode()
+    }
+
+    private fun assertDialogDisplayed() {
+        composeRule.onNodeWithText("Message from this site").assertIsDisplayed()
+        composeRule.onNodeWithText("Configuration alert").assertIsDisplayed()
+        composeRule.onNodeWithText("Confirm").assertIsDisplayed()
+    }
+
     private fun waitForConfiguration(condition: () -> Boolean) {
         composeRule.waitUntil(timeoutMillis = CONFIGURATION_TIMEOUT_MILLIS, condition = condition)
     }
@@ -424,6 +592,37 @@ class SessionConfigurationContinuityTest {
                 webView.loadUrl(url)
             },
         )
+    }
+
+    private fun startJavascript(script: String) {
+        onView(isAssignableFrom(WebView::class.java)).perform(
+            webViewAction("start JavaScript") { webView ->
+                webView.evaluateJavascript(script, null)
+            },
+        )
+        composeRule.waitUntil(timeoutMillis = PAGE_LOAD_TIMEOUT_MILLIS) {
+            composeRule.onAllNodesWithText("Configuration alert")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+    }
+
+    private fun currentWebView(): WebView {
+        val webView = AtomicReference<WebView>()
+        onView(isAssignableFrom(WebView::class.java)).perform(
+            webViewAction("capture the current WebView") { currentWebView ->
+                webView.set(currentWebView)
+            },
+        )
+        return checkNotNull(webView.get())
+    }
+
+    private fun currentWebViewTitle(webView: WebView): String? {
+        val title = AtomicReference<String?>()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            title.set(webView.title)
+        }
+        return title.get()
     }
 
     private fun scrollWebViewTo(scrollY: Int) {

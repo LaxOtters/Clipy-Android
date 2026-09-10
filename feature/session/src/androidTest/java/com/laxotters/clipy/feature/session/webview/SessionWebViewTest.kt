@@ -22,6 +22,7 @@ import androidx.test.espresso.web.webdriver.DriverAtoms.webClick
 import androidx.test.espresso.web.webdriver.Locator
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -332,10 +333,13 @@ class SessionWebViewTest {
 
         composeRule.setContent {
             val controller = rememberSessionWebViewController()
+            val dialogManager = rememberClipyJsDialogManager()
+
             testState.controller.set(controller)
             SessionWebView(
                 url = initialUrl,
                 controller = controller,
+                dialogManager = dialogManager,
                 onPageStateChanged = { url, canGoBack, canGoForward ->
                     testState.page.set(
                         PageState(
