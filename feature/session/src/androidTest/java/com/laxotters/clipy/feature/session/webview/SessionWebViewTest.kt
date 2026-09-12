@@ -460,13 +460,12 @@ class SessionWebViewTest {
                     val x = view.width / 2f
                     val startY = view.height * 0.8f
                     val endY = view.height * 0.2f
-                    dispatchTouch(view, downTime, downTime, MotionEvent.ACTION_DOWN, x, startY)
+                    view.dispatchTouch(downTime, downTime, MotionEvent.ACTION_DOWN, x, startY)
                     uiController.loopMainThreadForAtLeast(SWIPE_MOVE_INTERVAL_MILLIS)
                     repeat(SWIPE_MOVE_COUNT) { index ->
                         val progress = (index + 1f) / SWIPE_MOVE_COUNT
                         val y = startY + ((endY - startY) * progress)
-                        dispatchTouch(
-                            view,
+                        view.dispatchTouch(
                             downTime,
                             SystemClock.uptimeMillis(),
                             MotionEvent.ACTION_MOVE,
@@ -475,8 +474,7 @@ class SessionWebViewTest {
                         )
                         uiController.loopMainThreadForAtLeast(SWIPE_MOVE_INTERVAL_MILLIS)
                     }
-                    dispatchTouch(
-                        view,
+                    view.dispatchTouch(
                         downTime,
                         SystemClock.uptimeMillis(),
                         MotionEvent.ACTION_UP,
@@ -515,8 +513,7 @@ class SessionWebViewTest {
         }
     }
 
-    private fun dispatchTouch(
-        view: View,
+    private fun View.dispatchTouch(
         downTime: Long,
         eventTime: Long,
         action: Int,
@@ -525,7 +522,7 @@ class SessionWebViewTest {
     ) {
         val event = MotionEvent.obtain(downTime, eventTime, action, x, y, 0)
         try {
-            view.dispatchTouchEvent(event)
+            dispatchTouchEvent(event)
         } finally {
             event.recycle()
         }

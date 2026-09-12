@@ -1,6 +1,3 @@
-// TODO: design system 컴포넌트로 분리 후 suppress 제거
-@file:Suppress("TooManyFunctions")
-
 package com.laxotters.clipy.feature.session
 
 import androidx.activity.compose.BackHandler
