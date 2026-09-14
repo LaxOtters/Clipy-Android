@@ -1,5 +1,6 @@
 package com.laxotters.clipy.core.designsystem.component.dialog
 
+import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -106,12 +108,17 @@ internal fun DialogLayout(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val screenVerticalPadding = if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+        DialogDefaults.landscapeScreenVerticalPadding
+    } else {
+        DialogDefaults.screenVerticalPadding
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(
                 horizontal = DialogDefaults.screenHorizontalPadding,
-                vertical = DialogDefaults.screenVerticalPadding,
+                vertical = screenVerticalPadding,
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -201,11 +208,20 @@ internal fun DialogMessage(
     modifier: Modifier = Modifier,
     textAlign: TextAlign = TextAlign.Center,
     showErrorIcon: Boolean = false,
+    scrollTitleWithDescription: Boolean = false,
 ) {
-    val descriptionScrollState = rememberScrollState()
+    val scrollState = rememberScrollState()
 
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (scrollTitleWithDescription) {
+                    Modifier.verticalScroll(scrollState)
+                } else {
+                    Modifier
+                },
+            ),
         horizontalAlignment = if (textAlign == TextAlign.Start) {
             Alignment.Start
         } else {
@@ -232,11 +248,15 @@ internal fun DialogMessage(
             text = description,
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(
-                    weight = 1f,
-                    fill = false,
-                )
-                .verticalScroll(descriptionScrollState),
+                .then(
+                    if (scrollTitleWithDescription) {
+                        Modifier
+                    } else {
+                        Modifier
+                            .weight(weight = 1f, fill = false)
+                            .verticalScroll(scrollState)
+                    },
+                ),
             color = ClipyTheme.colors.neutral.gray500,
             style = ClipyTheme.typography.body1Regular,
             textAlign = textAlign,

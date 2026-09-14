@@ -11,9 +11,10 @@ internal object DialogDefaults {
     val maxWidth = 384.dp
     val screenHorizontalPadding = 20.dp
     val screenVerticalPadding = 60.dp
+    val landscapeScreenVerticalPadding = 20.dp
     val contentPadding = 20.dp
     val contentSpacing = 24.dp
-    val headingTopPadding = 12.dp
+    val headingTopPadding = 6.dp
     val textSpacing = 8.dp
     val errorIconSpacing = 4.dp
     val actionSpacing = 12.dp

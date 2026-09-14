@@ -2,6 +2,7 @@
 
 package com.laxotters.clipy.core.designsystem.component.dialog
 
+import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,24 +55,10 @@ fun ClipyJsDialog(
     state: JsDialogState,
     modifier: Modifier = Modifier,
 ) {
-    ClipyDialogWindow(
-        modifier = modifier,
-    ) {
-        JsDialogContent(
-            source = source,
-            state = state,
-        )
-    }
-}
-
-@Composable
-private fun ColumnScope.JsDialogContent(
-    source: String,
-    state: JsDialogState,
-) {
     val promptInitialValue = (state as? JsDialogState.Prompt)
         ?.initialValue
         .orEmpty()
+    // 글꼴 크기나 density 변경으로 Dialog 창이 재생성돼도 입력값을 유지합니다.
     var promptValue by rememberSaveable(
         source,
         state.title,
@@ -80,11 +68,30 @@ private fun ColumnScope.JsDialogContent(
         mutableStateOf(promptInitialValue)
     }
 
+    ClipyDialogWindow(
+        modifier = modifier,
+    ) {
+        JsDialogContent(
+            source = source,
+            state = state,
+            promptValue = promptValue,
+            onPromptValueChange = { promptValue = it },
+        )
+    }
+}
+
+@Composable
+private fun ColumnScope.JsDialogContent(
+    source: String,
+    state: JsDialogState,
+    promptValue: String,
+    onPromptValueChange: (String) -> Unit,
+) {
     JsDialogBody(
         source = source,
         state = state,
         promptValue = promptValue,
-        onPromptValueChange = { promptValue = it },
+        onPromptValueChange = onPromptValueChange,
         modifier = Modifier.weight(
             weight = 1f,
             fill = false,
@@ -112,13 +119,7 @@ private fun JsDialogBody(
                 weight = 1f,
                 fill = false,
             )
-            .then(
-                if (state is JsDialogState.Alert) {
-                    Modifier
-                } else {
-                    Modifier.padding(top = DialogDefaults.headingTopPadding)
-                },
-            )
+            .padding(top = DialogDefaults.headingTopPadding)
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -148,6 +149,7 @@ private fun JsDialogBody(
             } else {
                 TextAlign.Center
             },
+            scrollTitleWithDescription = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE,
         )
         if (state is JsDialogState.Prompt) {
             Spacer(modifier = Modifier.height(DialogDefaults.textSpacing))
@@ -259,11 +261,16 @@ private fun JsDialogStatesPreview(
     @PreviewParameter(JsDialogPreviewProvider::class)
     state: JsDialogState,
 ) {
+    var promptValue by rememberSaveable(state) {
+        mutableStateOf((state as? JsDialogState.Prompt)?.initialValue.orEmpty())
+    }
     ClipyTheme {
         DialogLayout {
             JsDialogContent(
                 source = "Request from example.com",
                 state = state,
+                promptValue = promptValue,
+                onPromptValueChange = { promptValue = it },
             )
         }
     }
