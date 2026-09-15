@@ -3,7 +3,9 @@ package com.laxotters.clipy.feature.session.webview
 import android.view.View
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
@@ -20,6 +22,7 @@ import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import androidx.test.filters.SdkSuppress
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogHost
 import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
 import com.laxotters.clipy.feature.session.webview.client.SessionWebChromeClient
@@ -30,6 +33,9 @@ import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import org.hamcrest.Matcher
+import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.not
+import org.hamcrest.Matchers.sameInstance
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -152,10 +158,10 @@ class JsDialogWebViewTest {
             "/prompt",
             htmlResponse(
                 """
-                <button id="confirm" onclick="document.title=prompt('Prompt message', 'Clipy') ?? 'cancelled'">
+                <button id="confirm" onclick="var result=prompt('Prompt message', 'Clipy'); document.title=result === null ? 'cancelled' : result">
                     Confirm case
                 </button>
-                <button id="cancel" onclick="document.title=prompt('Cancel prompt', 'Initial') ?? 'cancelled'">
+                <button id="cancel" onclick="var result=prompt('Cancel prompt', 'Initial'); document.title=result === null ? 'cancelled' : result">
                     Cancel case
                 </button>
                 """.trimIndent(),
@@ -205,26 +211,77 @@ class JsDialogWebViewTest {
     }
 
     @Test
-    fun webViewRelease_cancelsActiveDialogAndClearsManagerSlot() {
-        dispatcher.respond(
-            "/alert",
-            htmlResponse(
-                """
-                <button id="alert" onclick="alert('Pending message')">Show alert</button>
-                """.trimIndent(),
-            ),
-        )
+    fun webViewRelease_cancelsDialogAndAcceptsReplacementRequest() {
+        dispatcher.respond("/alert", pendingAlertResponse())
         val testState = launchWebView("/alert")
+        val original = currentWebView()
         startJavascript("alert")
         assertDialogText("Pending message")
 
-        composeRule.runOnIdle { testState.isWebViewVisible.value = false }
+        composeRule.runOnIdle { testState.webViewIds.value = emptyList() }
+        waitForDialogToClose("Pending message")
+
+        composeRule.runOnIdle {
+            testState.pageUrl.set("")
+            testState.webViewIds.value = listOf(1)
+        }
+        waitForPage(testState, "/alert")
+        assertNotSame(original, currentWebView())
+        startJavascript("alert")
+        assertDialogText("Pending message")
+        composeRule.onNodeWithText("Confirm").performClick()
+        waitForDialogToClose("Pending message")
+        waitForDocumentTitle("completed")
+    }
+
+    @Test
+    fun previousWebViewRelease_keepsReplacementDialogAndResult() {
+        dispatcher.respond("/alert", pendingAlertResponse())
+        val testState = launchWebView("/alert")
+        val original = currentWebView()
+        startJavascript("alert")
+        assertDialogText("Pending message")
+        composeRule.onNodeWithText("Confirm").performClick()
+        waitForDialogToClose("Pending message")
+        waitForDocumentTitle("completed")
+
+        // 새 요청이 표시된 뒤 이전 WebView를 해제하는 순서를 실제 onRelease로 검증합니다.
+        composeRule.runOnIdle {
+            testState.pageUrl.set("")
+            testState.webViewIds.value = listOf(0, 1)
+        }
+        waitForPage(testState, "/alert")
+        onView(allOf(isAssignableFrom(WebView::class.java), not(sameInstance(original)))).perform(
+            webViewAction("start the replacement WebView request") { webView ->
+                webView.evaluateJavascript("document.getElementById('alert').click()", null)
+            },
+        )
+        assertDialogText("Pending message")
+
+        composeRule.runOnIdle { testState.webViewIds.value = listOf(1) }
+
+        assertDialogText("Pending message")
+        composeRule.onNodeWithText("Confirm").performClick()
+        waitForDialogToClose("Pending message")
+        waitForDocumentTitle("completed")
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 26)
+    fun closedCoordinator_rejectsRequestsAndDoesNotCancelReplacement() {
+        dispatcher.respond("/alert", pendingAlertResponse())
+        val testState = launchWebView("/alert")
+        val coordinator = currentCoordinator()
+        startJavascript("alert")
+        assertDialogText("Pending message")
+
+        composeRule.runOnIdle { testState.webViewIds.value = emptyList() }
 
         waitForDialogToClose("Pending message")
         var accepted = false
         var cancelCount = 0
         composeRule.runOnIdle {
-            accepted = testState.dialogCoordinator.get().showAlert(
+            accepted = coordinator.showAlert(
                 url = server.url("/next").toString(),
                 message = "Next message",
                 onConfirm = {},
@@ -236,14 +293,14 @@ class JsDialogWebViewTest {
 
         composeRule.runOnIdle {
             testState.pageUrl.set("")
-            testState.isWebViewVisible.value = true
+            testState.webViewIds.value = listOf(1)
         }
         waitForPage(testState, "/alert")
         val replacement = currentCoordinator()
-        assertNotSame(testState.dialogCoordinator.get(), replacement)
+        assertNotSame(coordinator, replacement)
         startJavascript("alert")
         assertDialogText("Pending message")
-        composeRule.runOnIdle { testState.dialogCoordinator.get().close() }
+        composeRule.runOnIdle { coordinator.close() }
         assertDialogText("Pending message")
         composeRule.onNodeWithText("Confirm").performClick()
         waitForDialogToClose("Pending message")
@@ -254,10 +311,13 @@ class JsDialogWebViewTest {
         dispatcher.respond(
             "/background",
             htmlResponse(
-                """<button id="alert" onclick="alert('Background message'); document.title='completed'">Alert</button>""",
+                """
+                <button id="alert" onclick="alert('Background message'); document.title='completed'">Alert</button>
+                """.trimIndent(),
             ),
         )
-        val state = launchWebView("/background")
+        launchWebView("/background")
+        val webView = currentWebView()
         startJavascript("alert")
         assertDialogText("Background message")
 
@@ -268,7 +328,7 @@ class JsDialogWebViewTest {
         composeRule.onNodeWithText("Confirm").performClick()
         waitForDialogToClose("Background message")
         waitForDocumentTitle("completed")
-        assertSame(state.dialogCoordinator.get(), currentCoordinator())
+        assertSame(webView, currentWebView())
     }
 
     private fun launchWebView(path: String): JsDialogTestState {
@@ -276,26 +336,37 @@ class JsDialogWebViewTest {
         val initialUrl = server.url(path).toString()
 
         composeRule.setContent {
-            val controller = rememberSessionWebViewController()
             val dialogManager = rememberClipyJsDialogManager()
-            if (testState.isWebViewVisible.value) {
-                SessionWebView(
-                    url = initialUrl,
-                    controller = controller,
-                    dialogManager = dialogManager,
-                    onPageStateChanged = { url, _, _ -> testState.pageUrl.set(url) },
-                    onRootScrolled = { _, _, _, _ -> },
-                    modifier = Modifier.fillMaxSize(),
-                )
+            testState.webViewIds.value.forEach { id ->
+                key(id) {
+                    val controller = rememberSessionWebViewController()
+                    SessionWebView(
+                        url = initialUrl,
+                        controller = controller,
+                        dialogManager = dialogManager,
+                        onPageStateChanged = { url, _, _ -> testState.pageUrl.set(url) },
+                        onRootScrolled = { _, _, _, _ -> },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
             ClipyJsDialogHost(manager = dialogManager)
         }
 
         waitForPage(testState, path)
-        testState.dialogCoordinator.set(currentCoordinator())
         return testState
     }
 
+    private fun currentWebView(): WebView {
+        val result = AtomicReference<WebView>()
+        onView(isAssignableFrom(WebView::class.java)).perform(
+            webViewAction("capture the current WebView") { result.set(it) },
+        )
+        return checkNotNull(result.get())
+    }
+
+    // WebChromeClient 조회 API는 26 이상에서 제공하므로 소유권 비교 테스트에만 사용합니다.
+    @RequiresApi(26)
     private fun currentCoordinator(): SessionWebDialogCoordinator {
         val coordinator = AtomicReference<SessionWebDialogCoordinator>()
         onView(isAssignableFrom(WebView::class.java)).perform(
@@ -368,6 +439,12 @@ class JsDialogWebViewTest {
         """.trimIndent(),
     )
 
+    private fun pendingAlertResponse(): MockResponse = htmlResponse(
+        """
+        <button id="alert" onclick="alert('Pending message'); document.title='completed'">Show alert</button>
+        """.trimIndent(),
+    )
+
     private fun htmlResponse(body: String): MockResponse =
         MockResponse.Builder()
             .addHeader("Content-Type", "text/html; charset=utf-8")
@@ -419,9 +496,8 @@ class JsDialogWebViewTest {
     }
 
     private class JsDialogTestState {
-        val isWebViewVisible = mutableStateOf(true)
+        val webViewIds = mutableStateOf(listOf(0))
         val pageUrl = AtomicReference("")
-        val dialogCoordinator = AtomicReference<SessionWebDialogCoordinator>()
     }
 
     private companion object {
