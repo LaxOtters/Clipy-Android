@@ -5,6 +5,8 @@ import com.laxotters.clipy.core.navigation.Route
 import com.laxotters.clipy.domain.model.BottomSheetState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -242,6 +244,41 @@ class SessionViewModelTest {
         viewModel.dispatch(SessionUiEvent.SystemBackPressed)
 
         assertEquals(SessionUiSideEffect.NavigateToHome, effect.await())
+    }
+
+    @Test
+    fun errorMessageReceived_preservesSessionAndAllowsFollowingNavigationEffect() = runTest {
+        val viewModel = sessionViewModel()
+        viewModel.dispatch(
+            SessionUiEvent.PageLoaded(
+                sessionId = "session-1",
+                url = "https://example.com/page",
+                canGoBack = true,
+                canGoForward = false,
+            ),
+        )
+        val previousState = viewModel.state.value
+        val effects = async { viewModel.effect.take(2).toList() }
+
+        viewModel.dispatch(
+            SessionUiEvent.ErrorMessageReceived(
+                message = "Couldn't open the app.",
+                key = "session_external_app_failure",
+            ),
+        )
+        viewModel.dispatch(SessionUiEvent.SystemBackPressed)
+
+        assertEquals(previousState, viewModel.state.value)
+        assertEquals(
+            listOf(
+                SessionUiSideEffect.ShowSnackbar(
+                    message = "Couldn't open the app.",
+                    key = "session_external_app_failure",
+                ),
+                SessionUiSideEffect.GoBackInWebView,
+            ),
+            effects.await(),
+        )
     }
 
     private fun sessionViewModel(sessionId: String = "session-1") =
