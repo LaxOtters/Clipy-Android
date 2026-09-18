@@ -5,6 +5,7 @@ import androidx.annotation.MainThread
 /** WebView 해제를 한 번 수행하고, 일부 정리가 실패해도 남은 자원을 정리합니다. */
 internal class SessionWebViewRelease(
     private val closeDialog: () -> Unit,
+    private val closeExternalAction: () -> Unit,
     private val detachController: () -> Unit,
     private val releaseCallbacks: () -> Unit,
     private val removeFromParent: () -> Unit,
@@ -18,7 +19,15 @@ internal class SessionWebViewRelease(
 
         isReleased = true
         var failure: Throwable? = null
-        for (step in listOf(closeDialog, detachController, releaseCallbacks, removeFromParent, destroy)) {
+        val releaseSteps = listOf(
+            closeDialog,
+            closeExternalAction,
+            detachController,
+            releaseCallbacks,
+            removeFromParent,
+            destroy,
+        )
+        for (step in releaseSteps) {
             try {
                 step()
             } catch (error: Throwable) {

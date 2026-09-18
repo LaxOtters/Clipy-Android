@@ -15,14 +15,17 @@ internal class SessionWebDialogCoordinator(
     private val showDialog: (JsDialogRequest) -> Boolean,
     private val cancelActiveDialog: (JsDialogRequest) -> Unit,
     private var strings: SessionWebDialogStrings,
+    private val displayGate: SessionWebDialogGate = SessionWebDialogGate(),
 ) {
     constructor(
         manager: ClipyJsDialogManager,
         strings: SessionWebDialogStrings,
+        displayGate: SessionWebDialogGate,
     ) : this(
         showDialog = manager::show,
         cancelActiveDialog = manager::cancelActive,
         strings = strings,
+        displayGate = displayGate,
     )
 
     private var isClosed = false
@@ -136,7 +139,9 @@ internal class SessionWebDialogCoordinator(
         val request = ownedRequest
         ownedRequest = null
         if (request != null) {
-            cancelActiveDialog(request)
+            displayGate.cancel(request) {
+                cancelActiveDialog(request)
+            }
         }
     }
 
@@ -177,8 +182,9 @@ internal class SessionWebDialogCoordinator(
             if (ownedRequest === request) {
                 ownedRequest = null
             }
+            displayGate.release(request)
         }
-        if (isClosed || !showDialog(request)) {
+        if (isClosed || !displayGate.tryAcquire(request) || !showDialog(request)) {
             completion.cancel()
             return false
         }
