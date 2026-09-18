@@ -22,7 +22,6 @@ import androidx.test.espresso.web.webdriver.DriverAtoms.webClick
 import androidx.test.espresso.web.webdriver.Locator
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
-import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -333,34 +332,36 @@ class SessionWebViewTest {
 
         composeRule.setContent {
             val controller = rememberSessionWebViewController()
-            val dialogManager = rememberClipyJsDialogManager()
+            val dialogState = rememberSessionWebDialogState()
 
             testState.controller.set(controller)
             SessionWebView(
                 url = initialUrl,
                 controller = controller,
-                dialogManager = dialogManager,
-                onPageStateChanged = { url, canGoBack, canGoForward ->
-                    testState.page.set(
-                        PageState(
-                            url = url,
-                            canGoBack = canGoBack,
-                            canGoForward = canGoForward,
-                        ),
-                    )
-                    testState.pageLoadCount.incrementAndGet()
-                },
-                onRootScrolled = { deltaY, scrollableDistance, viewportHeight, touchSlopPx ->
-                    testState.rootScrollCount.incrementAndGet()
-                    testState.rootScroll.set(
-                        ScrollMetrics(
-                            deltaY = deltaY,
-                            scrollableDistance = scrollableDistance,
-                            viewportHeight = viewportHeight,
-                            touchSlopPx = touchSlopPx,
-                        ),
-                    )
-                },
+                dialogState = dialogState,
+                callbacks = SessionWebViewCallbacks(
+                    onPageFinished = { pageInfo ->
+                        testState.page.set(
+                            PageState(
+                                url = pageInfo.url,
+                                canGoBack = pageInfo.canGoBack,
+                                canGoForward = pageInfo.canGoForward,
+                            ),
+                        )
+                        testState.pageLoadCount.incrementAndGet()
+                    },
+                    onRootScrolled = { metrics ->
+                        testState.rootScrollCount.incrementAndGet()
+                        testState.rootScroll.set(
+                            ScrollMetrics(
+                                deltaY = metrics.deltaY,
+                                scrollableDistance = metrics.scrollableDistance,
+                                viewportHeight = metrics.viewportHeight,
+                                touchSlopPx = metrics.touchSlopPx,
+                            ),
+                        )
+                    },
+                ),
                 modifier = Modifier.fillMaxSize(),
             )
         }
