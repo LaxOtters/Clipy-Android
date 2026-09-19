@@ -5,9 +5,9 @@ import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetVa
 import com.laxotters.clipy.core.navigation.Route
 import com.laxotters.clipy.core.ui.base.BaseViewModel
 import com.laxotters.clipy.domain.model.BottomSheetState
-import com.laxotters.clipy.feature.session.policy.SessionChromeSnapshot
-import com.laxotters.clipy.feature.session.policy.SessionChromeStatePolicy
-import com.laxotters.clipy.feature.session.policy.SessionRootScrollIntentDetector
+import com.laxotters.clipy.feature.session.chrome.SessionChromeSnapshot
+import com.laxotters.clipy.feature.session.chrome.SessionChromeStatePolicy
+import com.laxotters.clipy.feature.session.chrome.SessionRootScrollIntentDetector
 import com.laxotters.clipy.feature.session.util.formatUrlLabel
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory

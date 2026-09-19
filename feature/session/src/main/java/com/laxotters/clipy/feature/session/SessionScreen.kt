@@ -40,13 +40,13 @@ import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarIco
 import com.laxotters.clipy.core.designsystem.component.snackbar.rememberClipySnackbarController
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import com.laxotters.clipy.domain.model.BottomSheetState
-import com.laxotters.clipy.feature.session.webview.SessionWebDialogHosts
-import com.laxotters.clipy.feature.session.webview.SessionWebDialogState
-import com.laxotters.clipy.feature.session.webview.SessionWebView
-import com.laxotters.clipy.feature.session.webview.SessionWebViewCallbacks
-import com.laxotters.clipy.feature.session.webview.SessionWebViewController
-import com.laxotters.clipy.feature.session.webview.rememberSessionWebDialogState
-import com.laxotters.clipy.feature.session.webview.rememberSessionWebViewController
+import com.laxotters.clipy.feature.session.browser.dialog.SessionWebDialogHosts
+import com.laxotters.clipy.feature.session.browser.dialog.SessionWebDialogState
+import com.laxotters.clipy.feature.session.browser.dialog.rememberSessionWebDialogState
+import com.laxotters.clipy.feature.session.browser.webview.SessionWebView
+import com.laxotters.clipy.feature.session.browser.webview.SessionWebViewCallbacks
+import com.laxotters.clipy.feature.session.browser.webview.SessionWebViewController
+import com.laxotters.clipy.feature.session.browser.webview.rememberSessionWebViewController
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
