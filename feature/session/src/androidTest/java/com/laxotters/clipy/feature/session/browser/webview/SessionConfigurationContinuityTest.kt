@@ -37,13 +37,14 @@ import androidx.test.filters.LargeTest
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarLayout
 import com.laxotters.clipy.core.navigation.Route
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.SessionTopBarState
 import com.laxotters.clipy.feature.session.SessionUiEvent
 import com.laxotters.clipy.feature.session.SessionViewModel
-import com.laxotters.clipy.feature.session.browser.dialog.SessionWebDialogHosts
-import com.laxotters.clipy.feature.session.browser.dialog.rememberSessionWebDialogState
+import com.laxotters.clipy.feature.session.browser.SessionBrowser
+import com.laxotters.clipy.feature.session.browser.rememberSessionBrowserState
 import java.util.concurrent.atomic.AtomicReference
 import org.hamcrest.CoreMatchers.containsString
 import org.hamcrest.Matcher
@@ -340,23 +341,15 @@ class SessionConfigurationContinuityTest {
 
         composeRule.activityRule.scenario.onActivity { activity ->
             activity.setContent {
-                val controller = rememberSessionWebViewController()
-                val dialogState = rememberSessionWebDialogState()
-
-                SessionWebView(
-                    url = initialUrl,
-                    controller = controller,
-                    dialogState = dialogState,
-                    callbacks = SessionWebViewCallbacks(
-                        onPageFinished = { pageInfo ->
-                            pageState.set(PageState(url = pageInfo.url))
+                ClipySnackbarLayout {
+                    val browserState = rememberSessionBrowserState(CONFIGURATION_TEST_SESSION_ID, initialUrl)
+                    SessionBrowser(
+                        state = browserState,
+                        initialUrl = initialUrl,
+                        onPageFinished = {
+                            pageState.set(PageState(url = browserState.currentUrl))
                             sessionViewModel.dispatch(
-                                SessionUiEvent.PageLoaded(
-                                    sessionId = CONFIGURATION_TEST_SESSION_ID,
-                                    url = pageInfo.url,
-                                    canGoBack = pageInfo.canGoBack,
-                                    canGoForward = pageInfo.canGoForward,
-                                ),
+                                SessionUiEvent.PageLoaded(sessionId = CONFIGURATION_TEST_SESSION_ID),
                             )
                         },
                         onRootScrolled = { metrics ->
@@ -369,10 +362,9 @@ class SessionConfigurationContinuityTest {
                                 ),
                             )
                         },
-                    ),
-                    modifier = Modifier.fillMaxSize(),
-                )
-                SessionWebDialogHosts(state = dialogState)
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
 
