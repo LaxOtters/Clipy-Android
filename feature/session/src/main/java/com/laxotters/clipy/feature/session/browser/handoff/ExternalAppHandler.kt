@@ -1,5 +1,6 @@
 package com.laxotters.clipy.feature.session.browser.handoff
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -80,7 +81,10 @@ internal fun createExternalAppHandler(context: Context): ExternalAppHandler =
                     PackageManager.MATCH_DEFAULT_ONLY,
                 ) ?: return@ExternalAppHandler null
                 val resolvedActivity = resolveInfo.activityInfo ?: return@ExternalAppHandler null
+
                 // resolveActivity는 앱 선택 화면도 반환할 수 있어 실제 처리 후보의 Activity와 대조합니다.
+                // 앱 이름을 조회할 수 없으면 일반 문구로 안내하므로 queries로 조회 범위를 넓히지 않습니다.
+                @SuppressLint("QueryPermissionsNeeded")
                 val isHandler = packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
                     .any { candidate ->
                         candidate.activityInfo?.let { activity ->
