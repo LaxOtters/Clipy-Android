@@ -4,32 +4,54 @@ import android.webkit.WebView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import com.laxotters.clipy.feature.session.browser.SessionPageNavigation
+import com.laxotters.clipy.feature.session.browser.webview.client.SessionWebViewClient
 
 @Stable
 class SessionWebViewController internal constructor() {
-    private var webView: WebView? = null
+    private var connection: Connection? = null
 
     fun goBack() {
-        webView?.takeIf { it.canGoBack() }?.goBack()
+        connection?.webView?.takeIf { it.canGoBack() }?.goBack()
     }
 
     fun goForward() {
-        webView?.takeIf { it.canGoForward() }?.goForward()
+        connection?.webView?.takeIf { it.canGoForward() }?.goForward()
     }
 
     fun reload() {
-        webView?.reload()
+        val current = connection ?: return
+        current.client.reload(current.webView)
     }
 
-    internal fun attach(webView: WebView) {
-        this.webView = webView
+    internal fun attach(webView: WebView, webViewId: Long, webViewClient: SessionWebViewClient) {
+        connection = Connection(webView, webViewId, webViewClient)
+    }
+
+    internal fun retry(navigation: SessionPageNavigation): Boolean {
+        val current = connection?.takeIf { it.webViewId == navigation.webViewId } ?: return false
+        current.client.retry(current.webView, navigation.url)
+        return true
+    }
+
+    internal fun goBack(webViewId: Long): Boolean {
+        val view = connection?.takeIf { it.webViewId == webViewId }?.webView ?: return false
+        if (!view.canGoBack()) return false
+        view.goBack()
+        return true
     }
 
     internal fun detach(webView: WebView) {
-        if (this.webView === webView) {
-            this.webView = null
+        if (connection?.webView === webView) {
+            connection = null
         }
     }
+
+    private class Connection(
+        val webView: WebView,
+        val webViewId: Long,
+        val client: SessionWebViewClient,
+    )
 }
 
 @Composable

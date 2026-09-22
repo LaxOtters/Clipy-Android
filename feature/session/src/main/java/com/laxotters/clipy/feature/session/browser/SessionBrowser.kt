@@ -1,18 +1,24 @@
 package com.laxotters.clipy.feature.session.browser
 
 import android.content.Context
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarIcon
 import com.laxotters.clipy.core.designsystem.component.snackbar.rememberClipySnackbarController
 import com.laxotters.clipy.feature.session.browser.dialog.SessionWebDialogHosts
 import com.laxotters.clipy.feature.session.browser.dialog.rememberSessionWebDialogState
 import com.laxotters.clipy.feature.session.browser.handoff.ExternalAppHandler
 import com.laxotters.clipy.feature.session.browser.handoff.createExternalAppHandler
+import com.laxotters.clipy.feature.session.browser.recovery.SessionRecoveryContent
 import com.laxotters.clipy.feature.session.browser.webview.RootScrollMetrics
+import com.laxotters.clipy.feature.session.browser.webview.SessionNetworkAvailabilityReader
 import com.laxotters.clipy.feature.session.browser.webview.SessionWebView
 import com.laxotters.clipy.feature.session.browser.webview.SessionWebViewCallbacks
 import kotlinx.coroutines.launch
@@ -24,6 +30,7 @@ internal fun SessionBrowser(
     initialUrl: String?,
     onPageFinished: () -> Unit,
     onRootScrolled: (RootScrollMetrics) -> Unit,
+    onHomeRequested: () -> Unit,
     modifier: Modifier = Modifier,
     externalAppHandlerFactory: (Context) -> ExternalAppHandler = ::createExternalAppHandler,
 ) {
@@ -31,34 +38,42 @@ internal fun SessionBrowser(
         val dialogState = rememberSessionWebDialogState()
         val snackbarController = rememberClipySnackbarController()
         val scope = rememberCoroutineScope()
+        val context = LocalContext.current
+        val networkReader = remember(context) { SessionNetworkAvailabilityReader(context) }
 
         DisposableEffect(state) {
             onDispose { state.reset() }
         }
 
-        SessionWebView(
-            url = initialUrl,
-            controller = state.controller,
-            dialogState = dialogState,
-            callbacks = SessionWebViewCallbacks(
-                onPageFinished = { pageInfo ->
-                    state.updatePageInfo(pageInfo)
-                    onPageFinished()
-                },
-                onRootScrolled = onRootScrolled,
-                onErrorMessage = { message ->
-                    scope.launch {
-                        snackbarController.showSnackbar(
-                            message = message.message,
-                            icon = ClipySnackbarIcon.Error,
-                            key = message.key,
-                        )
-                    }
-                },
-            ),
-            modifier = modifier,
-            externalAppHandlerFactory = externalAppHandlerFactory,
-        )
+        Box(modifier) {
+            SessionWebView(
+                url = initialUrl,
+                controller = state.controller,
+                dialogState = dialogState,
+                callbacks = SessionWebViewCallbacks(
+                    onPageFinished = { pageInfo ->
+                        state.updatePageInfo(pageInfo)
+                        onPageFinished()
+                    },
+                    onRootScrolled = onRootScrolled,
+                    onPageLoadChanged = state::onPageLoadChanged,
+                    onHistoryChanged = state::updatePageInfo,
+                    onErrorMessage = { message ->
+                        scope.launch {
+                            snackbarController.showSnackbar(
+                                message = message.message,
+                                icon = ClipySnackbarIcon.Error,
+                                key = message.key,
+                            )
+                        }
+                    },
+                ),
+                externalAppHandlerFactory = externalAppHandlerFactory,
+                networkAvailability = networkReader::snapshot,
+                modifier = Modifier.fillMaxSize(),
+            )
+            SessionRecoveryContent(state, onHomeRequested)
+        }
         SessionWebDialogHosts(state = dialogState)
     }
 }
