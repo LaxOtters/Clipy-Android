@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_js_dialog_source">Request from %1$s</string>
+    <string name="session_js_dialog_alert_title">Message from this site</string>
+    <string name="session_js_dialog_confirm_title">Continue?</string>
+    <string name="session_js_dialog_prompt_title">Enter information</string>
+    <string name="session_js_dialog_before_unload_title">Leave this page?</string>
+    <string name="session_js_dialog_confirm_action">Confirm</string>
+    <string name="session_js_dialog_cancel_action">Cancel</string>
+    <string name="session_js_dialog_stay_action">Stay</string>
+    <string name="session_js_dialog_leave_action">Leave</string>
+</resources>

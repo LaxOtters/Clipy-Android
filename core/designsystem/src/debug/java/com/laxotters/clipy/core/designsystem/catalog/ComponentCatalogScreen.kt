@@ -37,11 +37,11 @@ import com.laxotters.clipy.core.designsystem.component.button.ClipyFooterButton
 import com.laxotters.clipy.core.designsystem.component.button.model.ButtonSize
 import com.laxotters.clipy.core.designsystem.component.button.model.ButtonType
 import com.laxotters.clipy.core.designsystem.component.button.model.FooterButtonType
-import com.laxotters.clipy.core.designsystem.component.dialog.ClipyDialogStyle
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipyDualDialog
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialog
-import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogState
 import com.laxotters.clipy.core.designsystem.component.dialog.ClipySingleDialog
+import com.laxotters.clipy.core.designsystem.component.dialog.DialogStyle
+import com.laxotters.clipy.core.designsystem.component.dialog.JsDialogState
 import com.laxotters.clipy.core.designsystem.component.error.ClipyErrorOverlay
 import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarController
 import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarIcon
@@ -347,7 +347,7 @@ private fun DialogSection() {
                 label = "확인",
                 onClick = { appDialog = null },
             ),
-            style = ClipyDialogStyle.Error,
+            style = DialogStyle.Error,
         )
 
         CatalogAppDialog.ErrorDual -> ClipyDualDialog(
@@ -361,7 +361,7 @@ private fun DialogSection() {
                 label = "취소",
                 onClick = { appDialog = null },
             ),
-            style = ClipyDialogStyle.Error,
+            style = DialogStyle.Error,
         )
 
         null -> Unit
@@ -370,7 +370,7 @@ private fun DialogSection() {
     when (jsDialog) {
         CatalogJsDialog.Alert -> ClipyJsDialog(
             source = "Request from example.com",
-            state = ClipyJsDialogState.Alert(
+            state = JsDialogState.Alert(
                 title = "알림",
                 description = "웹사이트에서 메시지를 보냈습니다.",
                 confirmAction = ClipyTextAction(
@@ -382,7 +382,7 @@ private fun DialogSection() {
 
         CatalogJsDialog.Confirm -> ClipyJsDialog(
             source = "Request from example.com",
-            state = ClipyJsDialogState.Confirm(
+            state = JsDialogState.Confirm(
                 title = "계속 진행할까요?",
                 description = "웹사이트 요청을 확인해주세요.",
                 confirmAction = ClipyTextAction(
@@ -398,7 +398,7 @@ private fun DialogSection() {
 
         CatalogJsDialog.Prompt -> ClipyJsDialog(
             source = "Request from example.com",
-            state = ClipyJsDialogState.Prompt(
+            state = JsDialogState.Prompt(
                 title = "이름을 입력해주세요",
                 description = "웹사이트에 전달할 값을 입력하세요.",
                 confirmAction = ClipyTextInputAction(

@@ -17,7 +17,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ClipySnackbarManagerTest {
+class SnackbarManagerTest {
     @Test
     fun differentKeys_areShownInFifoOrder() = runTest {
         val manager = createManager()

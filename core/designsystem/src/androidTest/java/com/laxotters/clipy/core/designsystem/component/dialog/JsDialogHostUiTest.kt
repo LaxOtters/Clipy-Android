@@ -18,7 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class ClipyJsDialogHostUiTest {
+class JsDialogHostUiTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
@@ -31,7 +31,7 @@ class ClipyJsDialogHostUiTest {
                 val manager = rememberClipyJsDialogManager()
                 LaunchedEffect(Unit) {
                     manager.show(
-                        ClipyJsDialogRequest.Prompt(
+                        JsDialogRequest.Prompt(
                             source = "Request from example.com",
                             title = "Enter a name",
                             description = "This value is sent to the website.",
@@ -68,7 +68,7 @@ class ClipyJsDialogHostUiTest {
     @Test
     fun reusedPromptRequest_startsWithInitialValue() {
         lateinit var manager: ClipyJsDialogManager
-        val request = ClipyJsDialogRequest.Prompt(
+        val request = JsDialogRequest.Prompt(
             source = "Request from example.com",
             title = "Enter a name",
             description = "This value is sent to the website.",

@@ -22,6 +22,7 @@ import androidx.test.espresso.web.webdriver.DriverAtoms.webClick
 import androidx.test.espresso.web.webdriver.Locator
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -332,10 +333,13 @@ class SessionWebViewTest {
 
         composeRule.setContent {
             val controller = rememberSessionWebViewController()
+            val dialogManager = rememberClipyJsDialogManager()
+
             testState.controller.set(controller)
             SessionWebView(
                 url = initialUrl,
                 controller = controller,
+                dialogManager = dialogManager,
                 onPageStateChanged = { url, canGoBack, canGoForward ->
                     testState.page.set(
                         PageState(
@@ -456,13 +460,12 @@ class SessionWebViewTest {
                     val x = view.width / 2f
                     val startY = view.height * 0.8f
                     val endY = view.height * 0.2f
-                    dispatchTouch(view, downTime, downTime, MotionEvent.ACTION_DOWN, x, startY)
+                    view.dispatchTouch(downTime, downTime, MotionEvent.ACTION_DOWN, x, startY)
                     uiController.loopMainThreadForAtLeast(SWIPE_MOVE_INTERVAL_MILLIS)
                     repeat(SWIPE_MOVE_COUNT) { index ->
                         val progress = (index + 1f) / SWIPE_MOVE_COUNT
                         val y = startY + ((endY - startY) * progress)
-                        dispatchTouch(
-                            view,
+                        view.dispatchTouch(
                             downTime,
                             SystemClock.uptimeMillis(),
                             MotionEvent.ACTION_MOVE,
@@ -471,8 +474,7 @@ class SessionWebViewTest {
                         )
                         uiController.loopMainThreadForAtLeast(SWIPE_MOVE_INTERVAL_MILLIS)
                     }
-                    dispatchTouch(
-                        view,
+                    view.dispatchTouch(
                         downTime,
                         SystemClock.uptimeMillis(),
                         MotionEvent.ACTION_UP,
@@ -511,8 +513,7 @@ class SessionWebViewTest {
         }
     }
 
-    private fun dispatchTouch(
-        view: View,
+    private fun View.dispatchTouch(
         downTime: Long,
         eventTime: Long,
         action: Int,
@@ -521,7 +522,7 @@ class SessionWebViewTest {
     ) {
         val event = MotionEvent.obtain(downTime, eventTime, action, x, y, 0)
         try {
-            view.dispatchTouchEvent(event)
+            dispatchTouchEvent(event)
         } finally {
             event.recycle()
         }

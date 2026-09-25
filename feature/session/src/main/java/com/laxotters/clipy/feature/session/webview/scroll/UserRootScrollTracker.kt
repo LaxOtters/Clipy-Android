@@ -1,4 +1,4 @@
-package com.laxotters.clipy.feature.session.webview
+package com.laxotters.clipy.feature.session.webview.scroll
 
 import com.laxotters.clipy.feature.session.ROOT_SCROLL_IDLE_DELAY_MILLIS
 import kotlin.math.abs
@@ -44,8 +44,7 @@ internal class UserRootScrollTracker(
         }
 
         isTouchActive = false
-        // 실제 root 이동을 사용자 drag로 한 번 이상 판별한 경우에만
-        // release 속도로 fling을 시작합니다.
+        // 실제 root 이동을 사용자 drag로 한 번 이상 판별한 경우에만 release 속도로 fling을 시작합니다.
         isFlingActive = hasUserRootScroll &&
             abs(yVelocityPxPerSecond) >= minimumFlingVelocityPxPerSecond
 
@@ -54,10 +53,6 @@ internal class UserRootScrollTracker(
         } else {
             reset()
         }
-    }
-
-    fun onTouchCancel() {
-        reset()
     }
 
     fun shouldForwardRootScroll(eventTimeMillis: Long): Boolean {
