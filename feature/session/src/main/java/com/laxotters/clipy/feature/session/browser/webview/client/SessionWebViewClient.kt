@@ -2,6 +2,7 @@ package com.laxotters.clipy.feature.session.browser.webview.client
 
 import android.graphics.Bitmap
 import android.view.View
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -25,6 +26,7 @@ internal class SessionWebViewClient(
     private val onExternalAppRequested: (String) -> Unit,
     private val documentTracker: SessionDocumentTracker,
     private val networkAvailability: () -> SessionNetworkAvailability = { SessionNetworkAvailability.UNKNOWN },
+    private val onRenderProcessGone: () -> Unit = {},
 ) : WebViewClient() {
     private var failure: SessionPageFailure? = null
     private var requestedNavigation: RequestedNavigation? = null
@@ -144,6 +146,14 @@ internal class SessionWebViewClient(
         if (isCurrentNavigation) {
             reportNavigationFinished(view)
         }
+    }
+
+    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+        // false를 반환하면 앱 전체가 종료되므로 이미 닫힌 WebView도 처리된 것으로 알립니다.
+        if (!isClosed) {
+            onRenderProcessGone()
+        }
+        return true
     }
 
     fun close() {
