@@ -25,6 +25,7 @@ import com.laxotters.clipy.core.designsystem.component.snackbar.rememberClipySna
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import com.laxotters.clipy.feature.session.browser.handoff.ExternalAppHandler
 import com.laxotters.clipy.feature.session.browser.webview.SessionConfigurationTestActivity
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.launch
@@ -51,6 +52,7 @@ class SessionBrowserUiTest {
 
     private lateinit var server: MockWebServer
     private val documentRequests = AtomicInteger()
+    private val documentLog = ConcurrentLinkedQueue<String>()
     private val browserVisible = mutableStateOf(true)
     private val generation = mutableStateOf(0)
     private val pageFinishedGeneration = AtomicInteger(-1)
@@ -70,9 +72,16 @@ class SessionBrowserUiTest {
                         .build()
                 } else {
                     if (request.url.encodedPath == "/start") documentRequests.incrementAndGet()
+                    // WebView가 자동으로 보내는 favicon 요청은 문서 요청 순서에서 제외합니다.
+                    if (request.url.encodedPath != "/favicon.ico") {
+                        documentLog += "${request.method} ${request.url.encodedPath}"
+                    }
                     MockResponse.Builder()
                         .addHeader("Content-Type", "text/html; charset=utf-8")
-                        .body("""<a id="open" style="display:block;padding:48px" href="clipy-test://open">Open</a>""")
+                        .body(
+                            """<a id="open" style="display:block;padding:48px" href="clipy-test://open">Open</a>""" +
+                                """<form id="form" method="post" action="/submit"><input name="token" value="kept"></form>""",
+                        )
                         .build()
                 }
         }
@@ -160,6 +169,50 @@ class SessionBrowserUiTest {
         assertFalse(browserState.get().canGoForward)
     }
 
+    @Test
+    fun rendererCrash_waitsForReopenAndOpensLastPageInNewWebView() {
+        launchBrowser()
+        val nextUrl = server.url("/next").toString()
+        val original = currentWebView()
+        composeRule.runOnIdle { original.loadUrl(nextUrl) }
+        composeRule.waitUntil(10_000) { browserState.get().currentUrl == nextUrl }
+
+        composeRule.runOnIdle { original.loadUrl("chrome://crash") }
+        waitForText("This page stopped responding")
+        composeRule.onNodeWithText("Reopen page").assertIsDisplayed()
+        assertFalse(browserState.get().canGoBack)
+        // 사용자가 선택하기 전에는 다시 열지 않습니다.
+        val requestsBeforeReopen = documentLog.toList()
+        Thread.sleep(AUTO_REOPEN_WAIT_MS)
+        assertEquals(requestsBeforeReopen, documentLog.toList())
+
+        composeRule.onNodeWithText("Reopen page").performClick()
+        composeRule.waitUntil(10_000) {
+            browserState.get().pageRecovery == null && browserState.get().currentUrl == nextUrl
+        }
+        assertNotSame(original, currentWebView())
+        assertFalse(browserState.get().canGoBack)
+        assertEquals("GET /next", documentLog.last())
+    }
+
+    @Test
+    fun rendererKillAfterPost_refreshReopensWithGetWithoutResubmitting() {
+        launchBrowser()
+        val original = currentWebView()
+        composeRule.runOnIdle { original.evaluateJavascript("document.getElementById('form').submit()", null) }
+        val submitUrl = server.url("/submit").toString()
+        composeRule.waitUntil(10_000) { browserState.get().currentUrl == submitUrl }
+
+        composeRule.runOnIdle { original.loadUrl("chrome://kill") }
+        waitForText("This page stopped responding")
+
+        composeRule.runOnIdle { browserState.get().reload() }
+        composeRule.waitUntil(10_000) { browserState.get().pageRecovery == null }
+        assertNotSame(original, currentWebView())
+        assertEquals(1, documentLog.count { it == "POST /submit" })
+        assertEquals("GET /submit", documentLog.last())
+    }
+
     private fun launchBrowser() {
         val initialUrl = server.url("/start").toString()
         composeRule.setContent {
@@ -220,5 +273,9 @@ class SessionBrowserUiTest {
             },
         )
         return result.get()
+    }
+
+    private companion object {
+        const val AUTO_REOPEN_WAIT_MS = 1_000L
     }
 }
