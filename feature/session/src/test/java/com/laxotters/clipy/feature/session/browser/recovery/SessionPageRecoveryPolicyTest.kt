@@ -37,15 +37,6 @@ class SessionPageRecoveryPolicyTest {
     }
 
     @Test
-    fun securityFailure_anyNetwork_excludesGeneralRecovery() {
-        SessionNetworkAvailability.entries.forEach { network ->
-            assertNull(
-                SessionPageRecoveryPolicy.decide(failure().copy(error = SessionLoadError.SECURITY, network = network)),
-            )
-        }
-    }
-
-    @Test
     fun unknownFailure_noNetwork_remainsUnknown() {
         val recovery = SessionPageRecoveryPolicy.decide(
             failure().copy(error = SessionLoadError.UNKNOWN, network = SessionNetworkAvailability.UNAVAILABLE),

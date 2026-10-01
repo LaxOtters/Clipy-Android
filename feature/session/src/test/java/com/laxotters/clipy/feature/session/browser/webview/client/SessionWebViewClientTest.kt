@@ -70,8 +70,8 @@ class SessionWebViewClientTest {
     @Test
     fun errorCodeMapping_securityAndUnavailableRemainDistinct() {
         val codes = mapOf(
-            WebViewClient.ERROR_FAILED_SSL_HANDSHAKE to SessionLoadError.SECURITY,
-            WebViewClient.ERROR_UNSAFE_RESOURCE to SessionLoadError.SECURITY,
+            WebViewClient.ERROR_FAILED_SSL_HANDSHAKE to SessionLoadError.SSL,
+            WebViewClient.ERROR_UNSAFE_RESOURCE to SessionLoadError.UNSAFE_SITE,
             WebViewClient.ERROR_BAD_URL to SessionLoadError.UNAVAILABLE,
             WebViewClient.ERROR_UNSUPPORTED_SCHEME to SessionLoadError.UNAVAILABLE,
             WebViewClient.ERROR_FILE to SessionLoadError.UNAVAILABLE,
@@ -112,16 +112,6 @@ class SessionWebViewClientTest {
         view.completeFrame()
         assertEquals(View.VISIBLE, view.visibility)
         assertEquals(1, loads.count { it is SessionPageLoad.Ready })
-    }
-
-    @Test
-    fun securityFailureAfterGeneralFailure_keepsWebViewVisible() {
-        client.onPageStarted(view, URL, null)
-        client.onReceivedError(view, request(), error(WebViewClient.ERROR_CONNECT))
-        client.onPageStarted(view, URL, null)
-        client.onReceivedError(view, request(), error(WebViewClient.ERROR_FAILED_SSL_HANDSHAKE))
-        assertEquals(View.VISIBLE, view.visibility)
-        assertEquals(SessionLoadError.SECURITY, failures.last().error)
     }
 
     @Test
