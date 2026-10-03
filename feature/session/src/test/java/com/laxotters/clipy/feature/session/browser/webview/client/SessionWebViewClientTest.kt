@@ -1,13 +1,17 @@
 package com.laxotters.clipy.feature.session.browser.webview.client
 
 import android.net.Uri
+import android.net.http.SslCertificate
+import android.net.http.SslError
 import android.view.View
 import android.webkit.RenderProcessGoneDetail
+import android.webkit.SslErrorHandler
 import android.webkit.TestWebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.test.core.app.ApplicationProvider
+import androidx.webkit.SafeBrowsingResponseCompat
 import com.laxotters.clipy.feature.session.browser.SessionLoadError
 import com.laxotters.clipy.feature.session.browser.SessionNetworkAvailability
 import com.laxotters.clipy.feature.session.browser.SessionPageLoad
@@ -21,7 +25,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadow.api.Shadow
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [24])
@@ -113,6 +119,73 @@ class SessionWebViewClientTest {
         assertEquals(View.VISIBLE, view.visibility)
         assertEquals(1, loads.count { it is SessionPageLoad.Ready })
     }
+
+    @Test
+    fun mainFrameSslError_cancelsAndBlocksWhilePreviousDocumentStaysVisible() {
+        showDocument("https://example.com/previous")
+        client.shouldOverrideUrlLoading(view, request())
+        val handler = sslHandler()
+        client.onReceivedSslError(view, handler, SslError(SslError.SSL_UNTRUSTED, certificate(), URL))
+        assertTrue(shadowOf(handler).wasCancelCalled())
+        assertEquals(SessionLoadError.SSL, failures.single().error)
+        assertTrue(failures.single().hasVisibleDocument)
+        assertEquals(View.VISIBLE, view.visibility)
+        // 차단 뒤 따라오는 일반 오류 callback은 보안 원인을 바꾸지 않습니다.
+        client.onReceivedError(view, request(), error(WebViewClient.ERROR_UNKNOWN))
+        assertEquals(SessionLoadError.SSL, failures.last().error)
+    }
+
+    @Test
+    fun firstLoadSslError_hidesErrorDocument() {
+        client.onReceivedSslError(view, sslHandler(), SslError(SslError.SSL_EXPIRED, certificate(), URL))
+        assertEquals(SessionLoadError.SSL, failures.single().error)
+        assertEquals(View.INVISIBLE, view.visibility)
+    }
+
+    @Test
+    fun subresourceSslError_cancelsWithoutReport() {
+        showDocument(URL)
+        val handler = sslHandler()
+        client.onReceivedSslError(
+            view,
+            handler,
+            SslError(SslError.SSL_UNTRUSTED, certificate(), "https://ads.example.com/a.js"),
+        )
+        assertTrue(shadowOf(handler).wasCancelCalled())
+        assertTrue(failures.isEmpty())
+    }
+
+    @Test
+    @Config(sdk = [27])
+    fun safeBrowsingHit_returnsToSafetyAndBlocksOnlyMainFrame() {
+        showDocument("https://example.com/previous")
+        val responses = mutableListOf<String>()
+        val response = object : SafeBrowsingResponseCompat() {
+            override fun showInterstitial(allowReporting: Boolean) {
+                responses += "interstitial"
+            }
+
+            override fun proceed(report: Boolean) {
+                responses += "proceed"
+            }
+
+            override fun backToSafety(report: Boolean) {
+                responses += "backToSafety:$report"
+            }
+        }
+        client.onSafeBrowsingHit(view, request(mainFrame = false), WebViewClient.SAFE_BROWSING_THREAT_MALWARE, response)
+        assertTrue(failures.isEmpty())
+        client.shouldOverrideUrlLoading(view, request())
+        client.onSafeBrowsingHit(view, request(), WebViewClient.SAFE_BROWSING_THREAT_MALWARE, response)
+        assertEquals(listOf("backToSafety:false", "backToSafety:false"), responses)
+        assertEquals(SessionLoadError.UNSAFE_SITE, failures.single().error)
+        assertTrue(failures.single().hasVisibleDocument)
+    }
+
+    private fun sslHandler(): SslErrorHandler = Shadow.newInstanceOf(SslErrorHandler::class.java)
+
+    // 판정에는 인증서 내용이 필요 없어 생성자를 거치지 않은 빈 인증서를 사용합니다.
+    private fun certificate(): SslCertificate = Shadow.newInstanceOf(SslCertificate::class.java)
 
     @Test
     fun finishBeforeVisualReadiness_doesNotStopNavigation() {

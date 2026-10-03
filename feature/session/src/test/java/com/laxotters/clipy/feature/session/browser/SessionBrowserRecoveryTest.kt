@@ -164,6 +164,39 @@ class SessionBrowserRecoveryTest {
         assertTrue(state.pageRecovery!!.isRunning)
     }
 
+    @Test
+    fun securityBlockOverPreviousPage_backAndRefreshReturnWithoutHistoryMove() {
+        state.updatePageInfo(PageInfo("https://example.com/previous", false, false))
+        fail(navigation(1), error = SessionLoadError.SSL, hasVisibleDocument = true)
+        val recovery = state.pageRecovery!!
+        assertTrue(recovery.showOverlay)
+        assertEquals(SessionRecoveryAction.RETURN_TO_PAGE, recovery.action)
+        // 이전 페이지 history가 없어도 차단 화면을 닫는 뒤로가기는 가능합니다.
+        assertTrue(state.canGoBack)
+        state.goBack()
+        assertNull(state.pageRecovery)
+
+        fail(navigation(2), error = SessionLoadError.UNSAFE_SITE, hasVisibleDocument = true)
+        state.reload()
+        assertNull(state.pageRecovery)
+
+        fail(navigation(3), error = SessionLoadError.UNSAFE_SITE, hasVisibleDocument = true)
+        state.performRecovery(navigation(3)) { error("Return must not request Home") }
+        assertNull(state.pageRecovery)
+    }
+
+    @Test
+    fun securityBlockWithoutPage_keepsBlockOnRefreshAndSendsBackHome() {
+        fail(navigation(1), error = SessionLoadError.SSL)
+        assertEquals(SessionRecoveryAction.GO_HOME, state.pageRecovery!!.action)
+        assertFalse(state.canGoBack)
+        state.reload()
+        assertEquals(SessionPageErrorCause.SSL, state.pageRecovery!!.cause)
+        var home = 0
+        state.performRecovery(navigation(1)) { home++ }
+        assertEquals(1, home)
+    }
+
     private fun fail(
         navigation: SessionPageNavigation,
         error: SessionLoadError = SessionLoadError.CONNECTION,

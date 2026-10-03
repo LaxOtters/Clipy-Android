@@ -37,6 +37,39 @@ class SessionPageRecoveryPolicyTest {
     }
 
     @Test
+    fun securityFailure_alwaysShowsBlockWithoutRetry() {
+        val causes = mapOf(
+            SessionLoadError.SSL to SessionPageErrorCause.SSL,
+            SessionLoadError.UNSAFE_SITE to SessionPageErrorCause.UNSAFE_SITE,
+        )
+        causes.forEach { (error, cause) ->
+            SessionNetworkAvailability.entries.forEach { network ->
+                val kept = SessionPageRecoveryPolicy.decide(
+                    failure().copy(error = error, network = network, hasVisibleDocument = true, canGoBack = true),
+                )
+                assertEquals(cause, kept.cause)
+                assertTrue(kept.showOverlay)
+                assertEquals(SessionRecoveryAction.RETURN_TO_PAGE, kept.action)
+            }
+            val back = SessionPageRecoveryPolicy.decide(failure().copy(error = error, canGoBack = true))
+            assertEquals(SessionRecoveryAction.GO_BACK, back.action)
+            val home = SessionPageRecoveryPolicy.decide(failure().copy(error = error))
+            assertEquals(SessionRecoveryAction.GO_HOME, home.action)
+        }
+    }
+
+    @Test
+    fun hidesWebView_onlyWhenNoDocumentRemains() {
+        assertTrue(SessionPageRecoveryPolicy.hidesWebView(failure().copy(error = SessionLoadError.SSL)))
+        assertFalse(
+            SessionPageRecoveryPolicy.hidesWebView(
+                failure().copy(error = SessionLoadError.SSL, hasVisibleDocument = true),
+            ),
+        )
+        assertTrue(SessionPageRecoveryPolicy.hidesWebView(failure()))
+    }
+
+    @Test
     fun unknownFailure_noNetwork_remainsUnknown() {
         val recovery = SessionPageRecoveryPolicy.decide(
             failure().copy(error = SessionLoadError.UNKNOWN, network = SessionNetworkAvailability.UNAVAILABLE),
