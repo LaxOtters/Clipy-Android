@@ -5,11 +5,8 @@ import com.laxotters.clipy.core.navigation.Route
 import com.laxotters.clipy.domain.model.BottomSheetState
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.take
-import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 
@@ -24,84 +21,46 @@ class SessionViewModelTest {
 
         assertEquals("session-1", state.sessionId)
         assertEquals(DEFAULT_HOME_URL, state.initialUrl)
-        assertEquals("google.com", state.currentUrlLabel)
         assertEquals(BottomSheetState.PEEK, state.bottomSheetState)
         assertEquals(SessionTopBarState.UNFOLDED, state.topBarState)
     }
 
     @Test
-    fun differentRoutes_createIndependentViewModelState() {
+    fun differentRoutes_createIndependentChromeState() {
         val firstViewModel = sessionViewModel(sessionId = "session-1")
-        firstViewModel.dispatch(
-            SessionUiEvent.PageLoaded(
-                sessionId = "session-1",
-                url = "https://example.com/page",
-                canGoBack = true,
-                canGoForward = false,
-            ),
-        )
+        firstViewModel.dispatch(SessionUiEvent.TopBarFoldClicked)
         val secondViewModel = sessionViewModel(sessionId = "session-2")
 
-        assertEquals("https://example.com/page", firstViewModel.state.value.currentUrl)
+        assertEquals(SessionTopBarState.FOLDED, firstViewModel.state.value.topBarState)
         assertEquals("session-2", secondViewModel.state.value.sessionId)
         assertEquals(DEFAULT_HOME_URL, secondViewModel.state.value.initialUrl)
-        assertEquals("", secondViewModel.state.value.currentUrl)
-        assertFalse(secondViewModel.state.value.canGoBack)
-        assertFalse(secondViewModel.state.value.canGoForward)
+        assertEquals(SessionTopBarState.UNFOLDED, secondViewModel.state.value.topBarState)
     }
 
     @Test
-    fun pageLoaded_matchingSessionId_updatesPageStateAndRestoresBrowsingChrome() {
+    fun pageLoaded_matchingSessionId_restoresBrowsingChromeAndKeepsInitialUrl() {
         val viewModel = sessionViewModel(sessionId = "session-1")
         viewModel.dispatch(SessionUiEvent.TopBarFoldClicked)
         viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.HIDDEN))
 
-        viewModel.dispatch(
-            SessionUiEvent.PageLoaded(
-                sessionId = "session-1",
-                url = "https://example.com/page",
-                canGoBack = true,
-                canGoForward = true,
-            ),
-        )
-        val state = viewModel.state.value
+        viewModel.dispatch(SessionUiEvent.PageLoaded(sessionId = "session-1"))
 
-        assertEquals("https://example.com/page", state.currentUrl)
-        assertEquals(true, state.canGoBack)
-        assertEquals(true, state.canGoForward)
+        val state = viewModel.state.value
         assertEquals(DEFAULT_HOME_URL, state.initialUrl)
-        assertEquals("example.com", state.currentUrlLabel)
         assertEquals(BottomSheetState.MINIMIZED, state.bottomSheetState)
         assertEquals(SessionTopBarState.UNFOLDED, state.topBarState)
     }
 
     @Test
-    fun pageLoaded_staleSessionId_keepsCurrentPageState() {
+    fun pageLoaded_staleSessionId_keepsChromeState() {
         val viewModel = sessionViewModel(sessionId = "session-1")
-        viewModel.dispatch(
-            SessionUiEvent.PageLoaded(
-                sessionId = "session-1",
-                url = "https://example.com/current",
-                canGoBack = true,
-                canGoForward = false,
-            ),
-        )
+        viewModel.dispatch(SessionUiEvent.TopBarFoldClicked)
+        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.HIDDEN))
+        val previousState = viewModel.state.value
 
-        viewModel.dispatch(
-            SessionUiEvent.PageLoaded(
-                sessionId = "session-0",
-                url = "https://stale.example.com/page",
-                canGoBack = false,
-                canGoForward = true,
-            ),
-        )
-        val state = viewModel.state.value
+        viewModel.dispatch(SessionUiEvent.PageLoaded(sessionId = "session-0"))
 
-        assertEquals("https://example.com/current", state.currentUrl)
-        assertEquals("example.com", state.currentUrlLabel)
-        assertEquals(true, state.canGoBack)
-        assertEquals(false, state.canGoForward)
-        assertEquals(DEFAULT_HOME_URL, state.initialUrl)
+        assertEquals(previousState, viewModel.state.value)
     }
 
     @Test
@@ -211,7 +170,7 @@ class SessionViewModelTest {
         val viewModel = sessionViewModel()
         viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(BottomSheetValue.EXPANDED))
 
-        viewModel.dispatch(SessionUiEvent.SystemBackPressed)
+        viewModel.dispatch(SessionUiEvent.SystemBackPressed(canGoBack = true))
         val state = viewModel.state.value
 
         assertEquals(BottomSheetState.PEEK, state.bottomSheetState)
@@ -224,14 +183,11 @@ class SessionViewModelTest {
         viewModel.dispatch(
             SessionUiEvent.PageLoaded(
                 sessionId = "session-1",
-                url = "https://example.com/page",
-                canGoBack = true,
-                canGoForward = false,
             ),
         )
         val effect = async { viewModel.effect.first() }
 
-        viewModel.dispatch(SessionUiEvent.SystemBackPressed)
+        viewModel.dispatch(SessionUiEvent.SystemBackPressed(canGoBack = true))
 
         assertEquals(SessionUiSideEffect.GoBackInWebView, effect.await())
     }
@@ -241,44 +197,21 @@ class SessionViewModelTest {
         val viewModel = sessionViewModel()
         val effect = async { viewModel.effect.first() }
 
-        viewModel.dispatch(SessionUiEvent.SystemBackPressed)
+        viewModel.dispatch(SessionUiEvent.SystemBackPressed(canGoBack = false))
 
         assertEquals(SessionUiSideEffect.NavigateToHome, effect.await())
     }
 
     @Test
-    fun errorMessageReceived_preservesSessionAndAllowsFollowingNavigationEffect() = runTest {
+    fun systemBackPressed_usesCurrentHistoryInputInsteadOfPreviousPress() = runTest {
         val viewModel = sessionViewModel()
-        viewModel.dispatch(
-            SessionUiEvent.PageLoaded(
-                sessionId = "session-1",
-                url = "https://example.com/page",
-                canGoBack = true,
-                canGoForward = false,
-            ),
-        )
-        val previousState = viewModel.state.value
-        val effects = async { viewModel.effect.take(2).toList() }
+        val webBack = async { viewModel.effect.first() }
+        viewModel.dispatch(SessionUiEvent.SystemBackPressed(canGoBack = true))
+        assertEquals(SessionUiSideEffect.GoBackInWebView, webBack.await())
 
-        viewModel.dispatch(
-            SessionUiEvent.ErrorMessageReceived(
-                message = "Couldn't open the app.",
-                key = "session_external_app_failure",
-            ),
-        )
-        viewModel.dispatch(SessionUiEvent.SystemBackPressed)
-
-        assertEquals(previousState, viewModel.state.value)
-        assertEquals(
-            listOf(
-                SessionUiSideEffect.ShowSnackbar(
-                    message = "Couldn't open the app.",
-                    key = "session_external_app_failure",
-                ),
-                SessionUiSideEffect.GoBackInWebView,
-            ),
-            effects.await(),
-        )
+        val home = async { viewModel.effect.first() }
+        viewModel.dispatch(SessionUiEvent.SystemBackPressed(canGoBack = false))
+        assertEquals(SessionUiSideEffect.NavigateToHome, home.await())
     }
 
     private fun sessionViewModel(sessionId: String = "session-1") =

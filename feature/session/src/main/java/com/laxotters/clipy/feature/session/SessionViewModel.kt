@@ -5,10 +5,9 @@ import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetVa
 import com.laxotters.clipy.core.navigation.Route
 import com.laxotters.clipy.core.ui.base.BaseViewModel
 import com.laxotters.clipy.domain.model.BottomSheetState
-import com.laxotters.clipy.feature.session.policy.SessionChromeSnapshot
-import com.laxotters.clipy.feature.session.policy.SessionChromeStatePolicy
-import com.laxotters.clipy.feature.session.policy.SessionRootScrollIntentDetector
-import com.laxotters.clipy.feature.session.util.formatUrlLabel
+import com.laxotters.clipy.feature.session.chrome.SessionChromeSnapshot
+import com.laxotters.clipy.feature.session.chrome.SessionChromeStatePolicy
+import com.laxotters.clipy.feature.session.chrome.SessionRootScrollIntentDetector
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -41,9 +40,6 @@ class SessionViewModel @AssistedInject constructor(
             is SessionUiEvent.BottomSheetValueChanged -> syncBottomSheetValue(event.value)
             is SessionUiEvent.PageLoaded -> updatePageState(
                 sessionId = event.sessionId,
-                url = event.url,
-                canGoBack = event.canGoBack,
-                canGoForward = event.canGoForward,
             )
 
             is SessionUiEvent.WebViewRootScrolled -> applyRootScrollChromePolicy(
@@ -53,18 +49,12 @@ class SessionViewModel @AssistedInject constructor(
                 touchSlopPx = event.touchSlopPx,
             )
 
-            SessionUiEvent.SystemBackPressed -> resolveSystemBack()
-            is SessionUiEvent.ErrorMessageReceived -> postSideEffect(
-                SessionUiSideEffect.ShowSnackbar(message = event.message, key = event.key),
-            )
+            is SessionUiEvent.SystemBackPressed -> resolveSystemBack(event.canGoBack)
         }
     }
 
     private fun updatePageState(
         sessionId: String,
-        url: String,
-        canGoBack: Boolean,
-        canGoForward: Boolean,
     ) {
         if (sessionId != currentState.sessionId) {
             return
@@ -72,12 +62,7 @@ class SessionViewModel @AssistedInject constructor(
 
         resetWebViewRootScrollTracking()
         updateState {
-            copy(
-                currentUrl = url,
-                currentUrlLabel = formatUrlLabel(url),
-                canGoBack = canGoBack,
-                canGoForward = canGoForward,
-            ).withChromeSnapshot(
+            withChromeSnapshot(
                 SessionChromeStatePolicy.onPageLoaded(toChromeSnapshot()),
             )
         }
@@ -131,7 +116,7 @@ class SessionViewModel @AssistedInject constructor(
         }
     }
 
-    private fun resolveSystemBack() {
+    private fun resolveSystemBack(canGoBack: Boolean) {
         resetWebViewRootScrollTracking()
         val state = currentState
         val sheetTarget = SessionChromeStatePolicy.collapseSheetForBack(
@@ -143,7 +128,7 @@ class SessionViewModel @AssistedInject constructor(
                 copy(bottomSheetState = sheetTarget)
             }
 
-            state.canGoBack -> postSideEffect(SessionUiSideEffect.GoBackInWebView)
+            canGoBack -> postSideEffect(SessionUiSideEffect.GoBackInWebView)
             else -> postSideEffect(SessionUiSideEffect.NavigateToHome)
         }
     }

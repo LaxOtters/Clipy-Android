@@ -3,7 +3,7 @@
 
     <application android:usesCleartextTraffic="true">
         <activity
-            android:name="com.laxotters.clipy.feature.session.webview.SessionConfigurationTestActivity"
+            android:name="com.laxotters.clipy.feature.session.browser.webview.SessionConfigurationTestActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode|fontScale|fontWeightAdjustment|density"
             android:exported="false" />
     </application>
