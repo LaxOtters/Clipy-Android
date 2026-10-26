@@ -10,90 +10,138 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
-import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogManager
 import com.laxotters.clipy.feature.session.webview.client.SessionWebChromeClient
 import com.laxotters.clipy.feature.session.webview.client.SessionWebViewClient
+import com.laxotters.clipy.feature.session.webview.download.DownloadSourceTracker
+import com.laxotters.clipy.feature.session.webview.navigation.ExternalAppHandler
+import com.laxotters.clipy.feature.session.webview.navigation.createExternalAppHandler
 import com.laxotters.clipy.feature.session.webview.scroll.RootScrollWebView
 
 /**
  * Session의 단일 Main WebView를 렌더링하고 페이지·방문 기록·root scroll 상태를 호출자에게 전달합니다.
- * 실제 WebView release 시 대기 중인 JavaScript Dialog 결과를 취소합니다.
+ * 실제 WebView release 시 대기 중인 JavaScript Dialog와 외부 이동 확인 요청을 정리합니다.
  */
 @Composable
 internal fun SessionWebView(
     url: String?,
     controller: SessionWebViewController,
-    dialogManager: ClipyJsDialogManager,
-    onPageStateChanged: (url: String, canGoBack: Boolean, canGoForward: Boolean) -> Unit,
-    onRootScrolled: (deltaY: Int, scrollableDistance: Int, viewportHeight: Int, touchSlopPx: Int) -> Unit,
+    dialogState: SessionWebDialogState,
+    callbacks: SessionWebViewCallbacks,
     modifier: Modifier = Modifier,
+    externalAppHandlerFactory: (Context) -> ExternalAppHandler = ::createExternalAppHandler,
 ) {
-    val currentOnPageStateChanged by rememberUpdatedState(onPageStateChanged)
-    val currentOnRootScrolled by rememberUpdatedState(onRootScrolled)
+    // 실제 WebView를 다시 만들지 않고도 오래 유지되는 callback에서 최신 호출부를 사용합니다.
+    val currentCallbacks by rememberUpdatedState(callbacks)
+    val currentExternalAppHandlerFactory by rememberUpdatedState(externalAppHandlerFactory)
     val dialogStrings = sessionWebDialogStrings()
+    val externalActionStrings = externalActionStrings()
     val loadState = remember { SessionWebViewLoadState() }
-    val callbacks = remember {
-        SessionWebViewCallbacks(
-            onPageFinished = { pageInfo ->
-                currentOnPageStateChanged(
-                    pageInfo.url,
-                    pageInfo.canGoBack,
-                    pageInfo.canGoForward,
-                )
-            },
-            onRootScrolled = { metrics ->
-                currentOnRootScrolled(
-                    metrics.deltaY,
-                    metrics.scrollableDistance,
-                    metrics.viewportHeight,
-                    metrics.touchSlopPx,
-                )
-            },
+    val dependencies = remember(controller, dialogState) {
+        WebViewDependencies(
+            controller = controller,
+            dialogState = dialogState,
+            callbacks = SessionWebViewCallbacks(
+                onPageFinished = { pageInfo -> currentCallbacks.onPageFinished(pageInfo) },
+                onRootScrolled = { metrics -> currentCallbacks.onRootScrolled(metrics) },
+                onErrorMessage = { message -> currentCallbacks.onErrorMessage(message) },
+            ),
+            externalAppHandlerFactory = { context -> currentExternalAppHandlerFactory(context) },
         )
     }
 
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            val coordinator = SessionWebDialogCoordinator(dialogManager, dialogStrings)
-            SessionWebViewContainer(context, coordinator, controller).apply {
-                webView.configureSessionWebView(
-                    callbacks = callbacks,
-                    dialogCoordinator = coordinator,
-                )
-                webView.onRootScrolled = callbacks.onRootScrolled
-            }
+            createSessionWebViewContainer(
+                context = context,
+                dependencies = dependencies,
+                dialogStrings = dialogStrings,
+                externalActionStrings = externalActionStrings,
+            )
         },
         update = { container ->
             container.dialogCoordinator.updateStrings(dialogStrings)
+            container.externalActionCoordinator.updateStrings(externalActionStrings)
             controller.attach(container.webView)
 
             // 전달된 URL이 바뀔 때만 새 탐색을 시작해 기존 WebView 상태를 유지합니다.
-            if (url != null && loadState.loadedUrl != url) {
-                loadState.loadedUrl = url
+            if (url != null && loadState.lastRequestedUrl != url) {
+                loadState.lastRequestedUrl = url
                 container.webView.loadUrl(url)
             }
         },
-        onRelease = { container ->
-            container.releaseAction.release()
-        },
+        onRelease = { container -> container.releaseAction.release() },
     )
 }
 
+private class WebViewDependencies(
+    val controller: SessionWebViewController,
+    val dialogState: SessionWebDialogState,
+    val callbacks: SessionWebViewCallbacks,
+    val externalAppHandlerFactory: (Context) -> ExternalAppHandler,
+)
+
+private fun createSessionWebViewContainer(
+    context: Context,
+    dependencies: WebViewDependencies,
+    dialogStrings: SessionWebDialogStrings,
+    externalActionStrings: ExternalActionStrings,
+): SessionWebViewContainer {
+    val dialogCoordinator = SessionWebDialogCoordinator(
+        manager = dependencies.dialogState.jsDialogManager,
+        strings = dialogStrings,
+        displayGate = dependencies.dialogState.displayGate,
+    )
+    val externalActionCoordinator = ExternalActionCoordinator(
+        dialogManager = dependencies.dialogState.externalActionManager,
+        appHandler = dependencies.externalAppHandlerFactory(context),
+        onErrorMessage = dependencies.callbacks.onErrorMessage,
+        strings = externalActionStrings,
+    )
+    val downloadSourceTracker = DownloadSourceTracker()
+    val webViewClient = SessionWebViewClient(
+        callbacks = dependencies.callbacks,
+        downloadSourceTracker = downloadSourceTracker,
+        onExternalAppRequested = externalActionCoordinator::requestExternalApp,
+    )
+    return SessionWebViewContainer(
+        context = context,
+        dialogCoordinator = dialogCoordinator,
+        externalActionCoordinator = externalActionCoordinator,
+        controller = dependencies.controller,
+        downloadSourceTracker = downloadSourceTracker,
+    ).apply {
+        webView.configureSessionWebView(
+            dialogCoordinator = dialogCoordinator,
+            webViewClient = webViewClient,
+        )
+        webView.onRootScrolled = dependencies.callbacks.onRootScrolled
+        // DownloadListener에는 frame 정보가 없어 같은 URL의 탐색 callback 근거로 출처를 확인합니다.
+        webView.setDownloadListener { downloadUrl, _, _, _, _ ->
+            val requestedUrl = downloadUrl.orEmpty()
+            if (webViewClient.consumeConfirmedMainFrameDownload(requestedUrl)) {
+                externalActionCoordinator.requestOpenInBrowser(requestedUrl)
+            } else {
+                externalActionCoordinator.reportUnsupportedDownload()
+            }
+        }
+    }
+}
+
 private class SessionWebViewLoadState {
-    var loadedUrl: String? = null
+    var lastRequestedUrl: String? = null
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 private fun WebView.configureSessionWebView(
-    callbacks: SessionWebViewCallbacks,
     dialogCoordinator: SessionWebDialogCoordinator,
+    webViewClient: SessionWebViewClient,
 ) {
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
     settings.setSupportMultipleWindows(false)
     settings.javaScriptCanOpenWindowsAutomatically = false
-    webViewClient = SessionWebViewClient(callbacks)
+    this.webViewClient = webViewClient
     webChromeClient = SessionWebChromeClient(dialogCoordinator)
 }
 
@@ -102,13 +150,18 @@ private fun WebView.configureSessionWebView(
 private class SessionWebViewContainer(
     context: Context,
     val dialogCoordinator: SessionWebDialogCoordinator,
+    val externalActionCoordinator: ExternalActionCoordinator,
     controller: SessionWebViewController,
+    downloadSourceTracker: DownloadSourceTracker,
 ) : FrameLayout(context) {
     val webView: RootScrollWebView = RootScrollWebView(context)
     val releaseAction = SessionWebViewRelease(
         closeDialog = dialogCoordinator::close,
+        closeExternalAction = externalActionCoordinator::close,
         detachController = { controller.detach(webView) },
         releaseCallbacks = {
+            downloadSourceTracker.clear()
+            webView.setDownloadListener(null)
             webView.onRootScrolled = null
             webView.release()
         },

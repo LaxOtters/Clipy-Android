@@ -58,9 +58,19 @@ sealed interface SessionUiEvent : UiEvent {
     ) : SessionUiEvent
 
     data object SystemBackPressed : SessionUiEvent
+
+    data class ErrorMessageReceived(
+        val message: String,
+        val key: String,
+    ) : SessionUiEvent
 }
 
 sealed interface SessionUiSideEffect : UiSideEffect {
     data object GoBackInWebView : SessionUiSideEffect
     data object NavigateToHome : SessionUiSideEffect
+
+    data class ShowSnackbar(
+        val message: String,
+        val key: String,
+    ) : SessionUiSideEffect
 }

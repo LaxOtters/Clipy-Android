@@ -36,15 +36,19 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetDefaults.HeaderHeight
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.ClipyBottomSheetLayout
-import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogHost
-import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogManager
-import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
+import com.laxotters.clipy.core.designsystem.component.snackbar.ClipySnackbarIcon
+import com.laxotters.clipy.core.designsystem.component.snackbar.rememberClipySnackbarController
 import com.laxotters.clipy.core.designsystem.theme.ClipyTheme
 import com.laxotters.clipy.domain.model.BottomSheetState
+import com.laxotters.clipy.feature.session.webview.SessionWebDialogHosts
+import com.laxotters.clipy.feature.session.webview.SessionWebDialogState
 import com.laxotters.clipy.feature.session.webview.SessionWebView
+import com.laxotters.clipy.feature.session.webview.SessionWebViewCallbacks
 import com.laxotters.clipy.feature.session.webview.SessionWebViewController
+import com.laxotters.clipy.feature.session.webview.rememberSessionWebDialogState
 import com.laxotters.clipy.feature.session.webview.rememberSessionWebViewController
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 @Composable
 fun SessionRoute(
@@ -53,59 +57,43 @@ fun SessionRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val webViewController = rememberSessionWebViewController()
-    val jsDialogManager = key(state.sessionId) { rememberClipyJsDialogManager() }
+    val webDialogState = key(state.sessionId) { rememberSessionWebDialogState() }
+    val snackbarController = rememberClipySnackbarController()
 
     BackHandler { viewModel.dispatch(SessionUiEvent.SystemBackPressed) }
 
     SessionScreen(
         state = state,
-        actions = ScreenActions(
-            topBarActions = TopBarActions(
-                onHomeClick = navigateToHome,
-                onAddItemClick = { },
-                onTopBarFoldClick = { viewModel.dispatch(SessionUiEvent.TopBarFoldClicked) },
-            ),
-            browserBarActions = BrowserBarActions(
-                onBackClick = webViewController::goBack,
-                onForwardClick = webViewController::goForward,
-                onRefreshClick = webViewController::reload,
-            ),
-            onBottomSheetValueChange = { bottomSheetValue ->
-                viewModel.dispatch(
-                    SessionUiEvent.BottomSheetValueChanged(bottomSheetValue),
-                )
-            },
+        actions = createScreenActions(
+            viewModel = viewModel,
+            webViewController = webViewController,
+            navigateToHome = navigateToHome,
         ),
     ) {
         SessionWebViewHost(
             sessionId = state.sessionId,
             initialUrl = state.initialUrl,
-            dependencies = SessionWebViewDependencies(
-                controller = webViewController,
-                dialogManager = jsDialogManager,
-            ),
-            onPageLoaded = viewModel::dispatch,
-            onRootScrolled = { deltaY, scrollableDistance, viewportHeight, touchSlopPx ->
-                viewModel.dispatch(
-                    SessionUiEvent.WebViewRootScrolled(
-                        deltaY = deltaY,
-                        scrollableDistance = scrollableDistance,
-                        viewportHeight = viewportHeight,
-                        touchSlopPx = touchSlopPx,
-                    ),
-                )
-            },
+            controller = webViewController,
+            dialogState = webDialogState,
+            onEvent = viewModel::dispatch,
             modifier = Modifier.fillMaxSize(),
         )
     }
 
-    ClipyJsDialogHost(manager = jsDialogManager)
-
-    LaunchedEffect(viewModel.effect) {
+    SessionWebDialogHosts(state = webDialogState)
+    LaunchedEffect(viewModel.effect, snackbarController) {
         viewModel.effect.collect { effect ->
             when (effect) {
                 SessionUiSideEffect.GoBackInWebView -> webViewController.goBack()
                 SessionUiSideEffect.NavigateToHome -> navigateToHome()
+                // Snackbar 표시가 다음 탐색 효과 수집을 막지 않도록 별도 coroutine에서 표시합니다.
+                is SessionUiSideEffect.ShowSnackbar -> launch {
+                    snackbarController.showSnackbar(
+                        message = effect.message,
+                        icon = ClipySnackbarIcon.Error,
+                        key = effect.key,
+                    )
+                }
             }
         }
     }
@@ -115,36 +103,65 @@ fun SessionRoute(
 private fun SessionWebViewHost(
     sessionId: String,
     initialUrl: String?,
-    dependencies: SessionWebViewDependencies,
-    onPageLoaded: (SessionUiEvent.PageLoaded) -> Unit,
-    onRootScrolled: (deltaY: Int, scrollableDistance: Int, viewportHeight: Int, touchSlopPx: Int) -> Unit,
+    controller: SessionWebViewController,
+    dialogState: SessionWebDialogState,
+    onEvent: (SessionUiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // sessionId가 바뀌면 WebView 참조와 초기 URL 로딩 상태를 새로 잡습니다.
     key(sessionId) {
         SessionWebView(
             url = initialUrl,
-            controller = dependencies.controller,
-            dialogManager = dependencies.dialogManager,
-            onPageStateChanged = { pageUrl, canGoBack, canGoForward ->
-                onPageLoaded(
-                    SessionUiEvent.PageLoaded(
-                        sessionId = sessionId,
-                        url = pageUrl,
-                        canGoBack = canGoBack,
-                        canGoForward = canGoForward,
-                    ),
-                )
-            },
-            onRootScrolled = onRootScrolled,
+            controller = controller,
+            dialogState = dialogState,
+            callbacks = SessionWebViewCallbacks(
+                onPageFinished = { pageInfo ->
+                    onEvent(
+                        SessionUiEvent.PageLoaded(
+                            sessionId = sessionId,
+                            url = pageInfo.url,
+                            canGoBack = pageInfo.canGoBack,
+                            canGoForward = pageInfo.canGoForward,
+                        ),
+                    )
+                },
+                onRootScrolled = { metrics ->
+                    onEvent(
+                        SessionUiEvent.WebViewRootScrolled(
+                            deltaY = metrics.deltaY,
+                            scrollableDistance = metrics.scrollableDistance,
+                            viewportHeight = metrics.viewportHeight,
+                            touchSlopPx = metrics.touchSlopPx,
+                        ),
+                    )
+                },
+                onErrorMessage = { message ->
+                    onEvent(SessionUiEvent.ErrorMessageReceived(message.message, message.key))
+                },
+            ),
             modifier = modifier,
         )
     }
 }
 
-private data class SessionWebViewDependencies(
-    val controller: SessionWebViewController,
-    val dialogManager: ClipyJsDialogManager,
+private fun createScreenActions(
+    viewModel: SessionViewModel,
+    webViewController: SessionWebViewController,
+    navigateToHome: () -> Unit,
+): ScreenActions = ScreenActions(
+    topBarActions = TopBarActions(
+        onHomeClick = navigateToHome,
+        onAddItemClick = { },
+        onTopBarFoldClick = { viewModel.dispatch(SessionUiEvent.TopBarFoldClicked) },
+    ),
+    browserBarActions = BrowserBarActions(
+        onBackClick = webViewController::goBack,
+        onForwardClick = webViewController::goForward,
+        onRefreshClick = webViewController::reload,
+    ),
+    onBottomSheetValueChange = { bottomSheetValue ->
+        viewModel.dispatch(SessionUiEvent.BottomSheetValueChanged(bottomSheetValue))
+    },
 )
 
 private data class ScreenActions(
@@ -477,7 +494,12 @@ private fun ControlButton(
                 minHeight = height,
             )
             .height(height),
-        colors = controlButtonColors(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            disabledContainerColor = Color.Transparent,
+            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+        ),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
     ) {
         Text(
@@ -488,14 +510,6 @@ private fun ControlButton(
         )
     }
 }
-
-@Composable
-private fun controlButtonColors() = ButtonDefaults.buttonColors(
-    containerColor = Color.Transparent,
-    contentColor = MaterialTheme.colorScheme.onSurface,
-    disabledContainerColor = Color.Transparent,
-    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-)
 
 @Preview(showBackground = true)
 @Composable

@@ -23,8 +23,6 @@ import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.filters.SdkSuppress
-import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogHost
-import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
 import com.laxotters.clipy.feature.session.webview.client.SessionWebChromeClient
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
@@ -336,21 +334,23 @@ class JsDialogWebViewTest {
         val initialUrl = server.url(path).toString()
 
         composeRule.setContent {
-            val dialogManager = rememberClipyJsDialogManager()
+            val dialogState = rememberSessionWebDialogState()
             testState.webViewIds.value.forEach { id ->
                 key(id) {
                     val controller = rememberSessionWebViewController()
                     SessionWebView(
                         url = initialUrl,
                         controller = controller,
-                        dialogManager = dialogManager,
-                        onPageStateChanged = { url, _, _ -> testState.pageUrl.set(url) },
-                        onRootScrolled = { _, _, _, _ -> },
+                        dialogState = dialogState,
+                        callbacks = SessionWebViewCallbacks(
+                            onPageFinished = { pageInfo -> testState.pageUrl.set(pageInfo.url) },
+                            onRootScrolled = {},
+                        ),
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
-            ClipyJsDialogHost(manager = dialogManager)
+            SessionWebDialogHosts(state = dialogState)
         }
 
         waitForPage(testState, path)
