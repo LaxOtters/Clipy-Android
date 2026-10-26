@@ -181,6 +181,7 @@ class SessionBrowserUiTest {
                             initialUrl = initialUrl,
                             onPageFinished = { pageFinishedGeneration.set(currentGeneration) },
                             onRootScrolled = {},
+                            onHomeRequested = {},
                             modifier = Modifier.fillMaxSize(),
                             externalAppHandlerFactory = {
                                 ExternalAppHandler(resolveAppName = { null }, launch = { false })

@@ -346,6 +346,7 @@ class SessionConfigurationContinuityTest {
                     SessionBrowser(
                         state = browserState,
                         initialUrl = initialUrl,
+                        onHomeRequested = {},
                         onPageFinished = {
                             pageState.set(PageState(url = browserState.currentUrl))
                             sessionViewModel.dispatch(

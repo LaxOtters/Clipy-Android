@@ -42,6 +42,7 @@ fun ClipyErrorOverlay(
     description: String,
     modifier: Modifier = Modifier,
     action: ClipyTextAction? = null,
+    actionEnabled: Boolean = true,
 ) {
     val scrollState = rememberScrollState()
 
@@ -87,6 +88,7 @@ fun ClipyErrorOverlay(
                     text = action.label,
                     onClick = action.onClick,
                     type = ButtonType.Secondary,
+                    enabled = actionEnabled,
                 )
             }
         }
@@ -125,6 +127,24 @@ private fun ClipyErrorOverlayActionPreview() {
                 label = "Go back",
                 onClick = {},
             ),
+        )
+    }
+}
+
+@Preview(
+    name = "Error overlay disabled action",
+    showBackground = true,
+    widthDp = 390,
+    heightDp = 520,
+)
+@Composable
+private fun ClipyErrorOverlayDisabledActionPreview() {
+    ClipyTheme {
+        ClipyErrorOverlay(
+            title = "No internet connection",
+            description = "Check your network connection and try again.",
+            action = ClipyTextAction("Try again", {}),
+            actionEnabled = false,
         )
     }
 }

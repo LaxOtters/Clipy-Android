@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import com.laxotters.clipy.feature.session.browser.SessionNetworkAvailability
 import com.laxotters.clipy.feature.session.browser.dialog.SessionWebDialogCoordinator
 import com.laxotters.clipy.feature.session.browser.dialog.SessionWebDialogState
 import com.laxotters.clipy.feature.session.browser.dialog.SessionWebDialogStrings
@@ -23,6 +24,7 @@ import com.laxotters.clipy.feature.session.browser.webview.client.SessionWebChro
 import com.laxotters.clipy.feature.session.browser.webview.client.SessionWebViewClient
 import com.laxotters.clipy.feature.session.browser.webview.download.DownloadSourceTracker
 import com.laxotters.clipy.feature.session.browser.webview.scroll.RootScrollWebView
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Session의 단일 Main WebView를 렌더링하고 페이지·방문 기록·root scroll 상태를 호출자에게 전달합니다.
@@ -36,10 +38,12 @@ internal fun SessionWebView(
     callbacks: SessionWebViewCallbacks,
     modifier: Modifier = Modifier,
     externalAppHandlerFactory: (Context) -> ExternalAppHandler = ::createExternalAppHandler,
+    networkAvailability: () -> SessionNetworkAvailability = { SessionNetworkAvailability.UNKNOWN },
 ) {
     // 실제 WebView를 다시 만들지 않고도 오래 유지되는 callback에서 최신 호출부를 사용합니다.
     val currentCallbacks by rememberUpdatedState(callbacks)
     val currentExternalAppHandlerFactory by rememberUpdatedState(externalAppHandlerFactory)
+    val currentNetworkAvailability by rememberUpdatedState(networkAvailability)
     val dialogStrings = sessionWebDialogStrings()
     val externalActionStrings = externalActionStrings()
     val loadState = remember { SessionWebViewLoadState() }
@@ -51,8 +55,11 @@ internal fun SessionWebView(
                 onPageFinished = { pageInfo -> currentCallbacks.onPageFinished(pageInfo) },
                 onRootScrolled = { metrics -> currentCallbacks.onRootScrolled(metrics) },
                 onErrorMessage = { message -> currentCallbacks.onErrorMessage(message) },
+                onPageLoadChanged = { load -> currentCallbacks.onPageLoadChanged(load) },
+                onHistoryChanged = { pageInfo -> currentCallbacks.onHistoryChanged(pageInfo) },
             ),
             externalAppHandlerFactory = { context -> currentExternalAppHandlerFactory(context) },
+            networkAvailability = { currentNetworkAvailability() },
         )
     }
 
@@ -69,7 +76,7 @@ internal fun SessionWebView(
         update = { container ->
             container.dialogCoordinator.updateStrings(dialogStrings)
             container.externalActionCoordinator.updateStrings(externalActionStrings)
-            controller.attach(container.webView)
+            controller.attach(container.webView, container.webViewId, container.webViewClient)
 
             // 전달된 URL이 바뀔 때만 새 탐색을 시작해 기존 WebView 상태를 유지합니다.
             if (url != null && loadState.lastRequestedUrl != url) {
@@ -86,6 +93,7 @@ private class WebViewDependencies(
     val dialogState: SessionWebDialogState,
     val callbacks: SessionWebViewCallbacks,
     val externalAppHandlerFactory: (Context) -> ExternalAppHandler,
+    val networkAvailability: () -> SessionNetworkAvailability,
 )
 
 private fun createSessionWebViewContainer(
@@ -106,17 +114,22 @@ private fun createSessionWebViewContainer(
         strings = externalActionStrings,
     )
     val downloadSourceTracker = DownloadSourceTracker()
+    val webViewId = nextWebViewId.incrementAndGet()
     val webViewClient = SessionWebViewClient(
         callbacks = dependencies.callbacks,
         downloadSourceTracker = downloadSourceTracker,
         onExternalAppRequested = externalActionCoordinator::requestExternalApp,
+        documentTracker = SessionDocumentTracker(webViewId),
+        networkAvailability = dependencies.networkAvailability,
     )
     return SessionWebViewContainer(
         context = context,
         dialogCoordinator = dialogCoordinator,
         externalActionCoordinator = externalActionCoordinator,
-        controller = dependencies.controller,
+        dependencies = dependencies,
         downloadSourceTracker = downloadSourceTracker,
+        webViewId = webViewId,
+        webViewClient = webViewClient,
     ).apply {
         webView.configureSessionWebView(
             dialogCoordinator = dialogCoordinator,
@@ -126,7 +139,7 @@ private fun createSessionWebViewContainer(
         // DownloadListener에는 frame 정보가 없어 같은 URL의 탐색 callback 근거로 출처를 확인합니다.
         webView.setDownloadListener { downloadUrl, _, _, _, _ ->
             val requestedUrl = downloadUrl.orEmpty()
-            if (webViewClient.consumeConfirmedMainFrameDownload(requestedUrl)) {
+            if (webViewClient.onDownloadRequested(requestedUrl)) {
                 externalActionCoordinator.requestOpenInBrowser(requestedUrl)
             } else {
                 externalActionCoordinator.reportUnsupportedDownload()
@@ -158,15 +171,18 @@ private class SessionWebViewContainer(
     context: Context,
     val dialogCoordinator: SessionWebDialogCoordinator,
     val externalActionCoordinator: ExternalActionCoordinator,
-    controller: SessionWebViewController,
+    dependencies: WebViewDependencies,
     downloadSourceTracker: DownloadSourceTracker,
+    val webViewId: Long,
+    val webViewClient: SessionWebViewClient,
 ) : FrameLayout(context) {
     val webView: RootScrollWebView = RootScrollWebView(context)
     val releaseAction = SessionWebViewRelease(
         closeDialog = dialogCoordinator::close,
         closeExternalAction = externalActionCoordinator::close,
-        detachController = { controller.detach(webView) },
+        detachController = { dependencies.controller.detach(webView) },
         releaseCallbacks = {
+            webViewClient.close()
             downloadSourceTracker.clear()
             webView.setDownloadListener(null)
             webView.onRootScrolled = null
@@ -189,3 +205,5 @@ private class SessionWebViewContainer(
         )
     }
 }
+
+private val nextWebViewId = AtomicLong()
