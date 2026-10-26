@@ -2,6 +2,7 @@ package com.laxotters.clipy.feature.session.browser.webview.client
 
 import android.net.Uri
 import android.view.View
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.TestWebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -246,6 +247,31 @@ class SessionWebViewClientTest {
         override fun hasGesture() = false
         override fun getMethod() = method
         override fun getRequestHeaders(): Map<String, String> = emptyMap()
+    }
+
+    @Test
+    @Config(sdk = [26])
+    fun renderProcessGone_isHandledAndReportedOnlyWhileOpen() {
+        var gone = 0
+        val rendererClient = SessionWebViewClient(
+            callbacks = SessionWebViewCallbacks(onPageFinished = {}, onRootScrolled = {}),
+            downloadSourceTracker = DownloadSourceTracker(),
+            onExternalAppRequested = {},
+            documentTracker = SessionDocumentTracker(2),
+            onRenderProcessGone = { gone += 1 },
+        )
+
+        // 플랫폼만 만드는 객체라 테스트에서 공개 생성자를 직접 사용합니다.
+        @Suppress("DEPRECATION")
+        val detail = object : RenderProcessGoneDetail() {
+            override fun didCrash() = true
+            override fun rendererPriorityAtExit() = WebView.RENDERER_PRIORITY_IMPORTANT
+        }
+        assertTrue(rendererClient.onRenderProcessGone(view, detail))
+        assertEquals(1, gone)
+        rendererClient.close()
+        assertTrue(rendererClient.onRenderProcessGone(view, detail))
+        assertEquals(1, gone)
     }
 
     private fun error(code: Int) = TestWebResourceError(code)

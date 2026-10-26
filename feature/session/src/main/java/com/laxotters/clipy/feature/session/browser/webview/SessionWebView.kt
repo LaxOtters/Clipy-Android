@@ -57,6 +57,7 @@ internal fun SessionWebView(
                 onErrorMessage = { message -> currentCallbacks.onErrorMessage(message) },
                 onPageLoadChanged = { load -> currentCallbacks.onPageLoadChanged(load) },
                 onHistoryChanged = { pageInfo -> currentCallbacks.onHistoryChanged(pageInfo) },
+                onRenderProcessGone = { webViewId -> currentCallbacks.onRenderProcessGone(webViewId) },
             ),
             externalAppHandlerFactory = { context -> currentExternalAppHandlerFactory(context) },
             networkAvailability = { currentNetworkAvailability() },
@@ -74,6 +75,8 @@ internal fun SessionWebView(
             )
         },
         update = { container ->
+            // renderer 종료로 먼저 폐기된 WebView를 Controller에 다시 연결하거나 로드하지 않습니다.
+            if (container.releaseAction.isReleased) return@AndroidView
             container.dialogCoordinator.updateStrings(dialogStrings)
             container.externalActionCoordinator.updateStrings(externalActionStrings)
             controller.attach(container.webView, container.webViewId, container.webViewClient)
@@ -115,14 +118,21 @@ private fun createSessionWebViewContainer(
     )
     val downloadSourceTracker = DownloadSourceTracker()
     val webViewId = nextWebViewId.incrementAndGet()
+    lateinit var container: SessionWebViewContainer
     val webViewClient = SessionWebViewClient(
         callbacks = dependencies.callbacks,
         downloadSourceTracker = downloadSourceTracker,
         onExternalAppRequested = externalActionCoordinator::requestExternalApp,
         documentTracker = SessionDocumentTracker(webViewId),
         networkAvailability = dependencies.networkAvailability,
+        onRenderProcessGone = {
+            // renderer가 종료된 WebView는 재사용할 수 없어 callback 안에서 바로 폐기합니다.
+            // AndroidView가 나중에 호출하는 release는 이미 해제된 상태라 아무 일도 하지 않습니다.
+            container.releaseAction.release()
+            dependencies.callbacks.onRenderProcessGone(webViewId)
+        },
     )
-    return SessionWebViewContainer(
+    container = SessionWebViewContainer(
         context = context,
         dialogCoordinator = dialogCoordinator,
         externalActionCoordinator = externalActionCoordinator,
@@ -146,6 +156,7 @@ private fun createSessionWebViewContainer(
             }
         }
     }
+    return container
 }
 
 private class SessionWebViewLoadState {
