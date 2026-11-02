@@ -34,11 +34,25 @@ internal class SessionBrowserState(
 
     val currentUrl: String get() = pageInfo?.url.orEmpty()
     val urlLabel: String get() = formatUrlLabel(pageInfo?.url ?: initialUrl().orEmpty())
-    val canGoBack: Boolean get() = pageInfo?.canGoBack == true
+    val canGoBack: Boolean
+        get() {
+            val recovery = pageRecovery
+            // 차단 화면 뒤에 남은 이전 페이지로 돌아가는 것도 뒤로가기로 처리합니다.
+            if (recovery?.isSecurityBlock == true) return recovery.action != SessionRecoveryAction.GO_HOME
+            return pageInfo?.canGoBack == true
+        }
     val canGoForward: Boolean get() = pageInfo?.canGoForward == true
     val canRefresh: Boolean get() = initialUrl() != null
 
-    fun goBack() = controller.goBack()
+    fun goBack() {
+        val recovery = pageRecovery
+        // 차단된 탐색은 이전 페이지를 덮지 않았으므로 WebView history를 이동하지 않고 화면만 닫습니다.
+        if (recovery?.action == SessionRecoveryAction.RETURN_TO_PAGE) {
+            returnToPage()
+            return
+        }
+        controller.goBack()
+    }
 
     fun goForward() = controller.goForward()
 
@@ -50,6 +64,11 @@ internal class SessionBrowserState(
                 performRecovery(recovery.navigation) {}
             }
             return
+        }
+        // 차단된 URL은 다시 요청하지 않고, 이전 페이지가 남아 있을 때만 그 페이지를 새로고침합니다.
+        if (recovery?.isSecurityBlock == true) {
+            if (recovery.action != SessionRecoveryAction.RETURN_TO_PAGE) return
+            returnToPage()
         }
         controller.reload()
     }
@@ -110,10 +129,20 @@ internal class SessionBrowserState(
                 webViewGeneration += 1
                 true
             }
+            SessionRecoveryAction.RETURN_TO_PAGE -> {
+                returnToPage()
+                true
+            }
         }
         if (!accepted && pageRecovery == running) {
             pageRecovery = recovery
         }
+    }
+
+    private fun returnToPage() {
+        pageRecovery = null
+        // 차단된 탐색의 완료 callback이 바꾼 주소 대신 WebView가 실제로 표시 중인 페이지를 반영합니다.
+        controller.currentPage()?.let { pageInfo = it }
     }
 
     /** 새 WebView가 본문을 표시할 때까지 renderer 종료 화면을 유지합니다. */
@@ -178,7 +207,8 @@ internal sealed interface SessionPageLoad {
 internal enum class SessionLoadError {
     CONNECTION,
     UNAVAILABLE,
-    SECURITY,
+    SSL,
+    UNSAFE_SITE,
     UNKNOWN,
 }
 
@@ -205,6 +235,8 @@ internal enum class SessionPageErrorCause {
     UNKNOWN,
     UNAVAILABLE,
     RENDERER_GONE,
+    SSL,
+    UNSAFE_SITE,
 }
 
 internal enum class SessionRecoveryAction {
@@ -212,6 +244,9 @@ internal enum class SessionRecoveryAction {
     GO_BACK,
     GO_HOME,
     REOPEN,
+
+    // 차단 화면 뒤에 그대로 남은 이전 페이지를 다시 보여 줍니다. 화면 문구는 Go back입니다.
+    RETURN_TO_PAGE,
 }
 
 internal data class SessionPageRecovery(
@@ -220,7 +255,24 @@ internal data class SessionPageRecovery(
     val action: SessionRecoveryAction?,
     val showOverlay: Boolean,
     val isRunning: Boolean = false,
-)
+) {
+    val isSecurityBlock: Boolean get() = cause.isSecurity
+}
+
+/** 재시도·계속 진행 없이 차단 화면으로만 안내하는 보안 원인입니다. */
+internal val SessionPageErrorCause.isSecurity: Boolean
+    get() = when (this) {
+        SessionPageErrorCause.SSL,
+        SessionPageErrorCause.UNSAFE_SITE,
+        -> true
+
+        SessionPageErrorCause.NO_NETWORK,
+        SessionPageErrorCause.SERVER,
+        SessionPageErrorCause.UNKNOWN,
+        SessionPageErrorCause.UNAVAILABLE,
+        SessionPageErrorCause.RENDERER_GONE,
+        -> false
+    }
 
 @Composable
 internal fun rememberSessionBrowserState(

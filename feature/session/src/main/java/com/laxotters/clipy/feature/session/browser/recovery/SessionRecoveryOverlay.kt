@@ -79,10 +79,20 @@ internal fun SessionRecoveryOverlay(
         SessionPageErrorCause.RENDERER_GONE ->
             R.string.session_recovery_renderer_gone_title to
                 R.string.session_recovery_renderer_gone_description
+
+        SessionPageErrorCause.SSL ->
+            R.string.session_recovery_ssl_title to
+                R.string.session_recovery_ssl_description
+
+        SessionPageErrorCause.UNSAFE_SITE ->
+            R.string.session_recovery_unsafe_site_title to
+                R.string.session_recovery_unsafe_site_description
     }
     val label = when (recovery.action) {
         SessionRecoveryAction.TRY_AGAIN -> R.string.session_recovery_try_again
-        SessionRecoveryAction.GO_BACK -> R.string.session_recovery_go_back
+        SessionRecoveryAction.GO_BACK,
+        SessionRecoveryAction.RETURN_TO_PAGE,
+        -> R.string.session_recovery_go_back
         SessionRecoveryAction.GO_HOME -> R.string.session_recovery_go_home
         SessionRecoveryAction.REOPEN -> R.string.session_recovery_reopen
         null -> null
@@ -122,7 +132,15 @@ internal class SessionRecoveryPreviewProvider : PreviewParameterProvider<Session
                 SessionPageErrorCause.RENDERER_GONE ->
                     listOf(SessionRecoveryAction.REOPEN, SessionRecoveryAction.GO_HOME)
 
-                else -> SessionRecoveryAction.entries - SessionRecoveryAction.REOPEN
+                SessionPageErrorCause.SSL,
+                SessionPageErrorCause.UNSAFE_SITE,
+                -> listOf(SessionRecoveryAction.RETURN_TO_PAGE, SessionRecoveryAction.GO_HOME)
+
+                else -> listOf(
+                    SessionRecoveryAction.TRY_AGAIN,
+                    SessionRecoveryAction.GO_BACK,
+                    SessionRecoveryAction.GO_HOME,
+                )
             }
             actions.forEach { action -> yield(SessionPageRecovery(navigation, cause, action, true)) }
         }

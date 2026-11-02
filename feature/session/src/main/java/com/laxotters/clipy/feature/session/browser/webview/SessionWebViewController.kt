@@ -34,6 +34,12 @@ class SessionWebViewController internal constructor() {
         return true
     }
 
+    internal fun currentPage(): PageInfo? {
+        val view = connection?.webView ?: return null
+        val url = view.url ?: return null
+        return PageInfo(url, view.canGoBack(), view.canGoForward())
+    }
+
     internal fun goBack(webViewId: Long): Boolean {
         val view = connection?.takeIf { it.webViewId == webViewId }?.webView ?: return false
         if (!view.canGoBack()) return false

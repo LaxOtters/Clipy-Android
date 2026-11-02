@@ -84,7 +84,10 @@ internal fun SessionWebView(
             // 전달된 URL이 바뀔 때만 새 탐색을 시작해 기존 WebView 상태를 유지합니다.
             if (url != null && loadState.lastRequestedUrl != url) {
                 loadState.lastRequestedUrl = url
-                container.webView.loadUrl(url)
+                // Safe Browsing 초기화가 끝난 뒤 첫 페이지를 열어 처음 탐색도 위험 사이트 검사를 받게 합니다.
+                SafeBrowsingStarter.Default.runWhenReady(container.context) {
+                    if (!container.releaseAction.isReleased) container.webView.loadUrl(url)
+                }
             }
         },
         onRelease = { container -> container.releaseAction.release() },

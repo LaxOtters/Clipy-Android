@@ -1,18 +1,24 @@
 package com.laxotters.clipy.feature.session.browser.webview.client
 
 import android.graphics.Bitmap
+import android.net.http.SslError
 import android.view.View
 import android.webkit.RenderProcessGoneDetail
-import android.webkit.WebResourceError
+import android.webkit.SslErrorHandler
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.SafeBrowsingResponseCompat
+import androidx.webkit.WebResourceErrorCompat
+import androidx.webkit.WebViewClientCompat
+import androidx.webkit.WebViewFeature
 import com.laxotters.clipy.feature.session.browser.SessionLoadError
 import com.laxotters.clipy.feature.session.browser.SessionNetworkAvailability
 import com.laxotters.clipy.feature.session.browser.SessionPageFailure
 import com.laxotters.clipy.feature.session.browser.SessionPageLoad
 import com.laxotters.clipy.feature.session.browser.SessionPageNavigation
+import com.laxotters.clipy.feature.session.browser.recovery.SessionPageRecoveryPolicy
 import com.laxotters.clipy.feature.session.browser.webview.PageInfo
 import com.laxotters.clipy.feature.session.browser.webview.SessionDocumentTracker
 import com.laxotters.clipy.feature.session.browser.webview.SessionWebViewCallbacks
@@ -27,7 +33,7 @@ internal class SessionWebViewClient(
     private val documentTracker: SessionDocumentTracker,
     private val networkAvailability: () -> SessionNetworkAvailability = { SessionNetworkAvailability.UNKNOWN },
     private val onRenderProcessGone: () -> Unit = {},
-) : WebViewClient() {
+) : WebViewClientCompat() {
     private var failure: SessionPageFailure? = null
     private var requestedNavigation: RequestedNavigation? = null
 
@@ -51,8 +57,8 @@ internal class SessionWebViewClient(
         startNavigation(url.orEmpty())
     }
 
-    override fun onPageCommitVisible(view: WebView, url: String?) {
-        if (isClosed || !documentTracker.commit(url.orEmpty())) return
+    override fun onPageCommitVisible(view: WebView, url: String) {
+        if (isClosed || !documentTracker.commit(url)) return
         // 오류 문서가 이전 본문을 덮으면 문서 유지 여부를 다시 반영합니다.
         failure?.let {
             failure = it.copy(
@@ -81,25 +87,45 @@ internal class SessionWebViewClient(
         callbacks.onHistoryChanged(PageInfo(url.orEmpty(), view.canGoBack(), view.canGoForward()))
     }
 
-    override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+    override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceErrorCompat) {
+        if (isClosed || !request.isForMainFrame) return
+        val errorCode = if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_RESOURCE_ERROR_GET_CODE)) {
+            error.errorCode
+        } else {
+            WebViewClient.ERROR_UNKNOWN
+        }
+        reportMainFrameFailure(view, request.url.toString(), request.method, errorCode.toLoadError())
+    }
+
+    override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
+        handler.cancel()
+        if (isClosed) return
+        val url = error.url
+        // 다른 URL의 인증서 오류는 하위 리소스이므로 요청만 막고 화면은 바꾸지 않습니다.
+        if (documentTracker.navigation?.let { it.url != url } == true) return
+        val method = mainFrameRequest?.takeIf { it.url == url }?.method.orEmpty()
+        reportMainFrameFailure(view, url, method, SessionLoadError.SSL)
+    }
+
+    override fun onSafeBrowsingHit(
+        view: WebView,
+        request: WebResourceRequest,
+        threatType: Int,
+        callback: SafeBrowsingResponseCompat,
+    ) {
+        // 위험 사이트는 항상 안전한 이전 상태로 되돌리고 Google에 보고하지 않습니다.
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.SAFE_BROWSING_RESPONSE_BACK_TO_SAFETY)) {
+            callback.backToSafety(false)
+        } else {
+            super.onSafeBrowsingHit(view, request, threatType, callback)
+        }
         if (isClosed || !request.isForMainFrame) return
         val url = request.url.toString()
-        if (documentTracker.navigation == null) {
+        // 본문 요청이 확실하므로 앱이 직접 연 주소처럼 추적하지 못한 탐색도 차단 대상으로 등록합니다.
+        if (documentTracker.navigation?.url != url) {
             documentTracker.start(url)
         }
-        if (!documentTracker.fail(url)) return
-        val navigation = checkNotNull(documentTracker.navigation)
-        failure = SessionPageFailure(
-            navigation = navigation,
-            error = error.errorCode.toLoadError(),
-            method = request.method,
-            hasVisibleDocument = documentTracker.hasVisibleDocument,
-            canGoBack = view.canGoBack(),
-            canGoForward = view.canGoForward(),
-            network = networkAvailability(),
-        )
-        hideErrorDocument(view)
-        reportFailure()
+        reportMainFrameFailure(view, url, request.method, SessionLoadError.UNSAFE_SITE)
     }
 
     override fun shouldOverrideUrlLoading(
@@ -226,11 +252,33 @@ internal class SessionWebViewClient(
         callbacks.onPageLoadChanged(SessionPageLoad.Ready(navigation))
     }
 
+    private fun reportMainFrameFailure(view: WebView, url: String, method: String, error: SessionLoadError) {
+        if (documentTracker.navigation == null) {
+            documentTracker.start(url)
+        }
+        if (!documentTracker.fail(url)) return
+        val navigation = checkNotNull(documentTracker.navigation)
+        // 차단 뒤 따라오는 일반 오류 callback이 보안 차단 원인을 덮지 않게 합니다.
+        val securityError = failure
+            ?.takeIf { it.navigation == navigation && SessionPageRecoveryPolicy.decide(it).isSecurityBlock }
+            ?.error
+        failure = SessionPageFailure(
+            navigation = navigation,
+            error = securityError ?: error,
+            method = method,
+            hasVisibleDocument = documentTracker.hasVisibleDocument,
+            canGoBack = view.canGoBack(),
+            canGoForward = view.canGoForward(),
+            network = networkAvailability(),
+        )
+        hideErrorDocument(view)
+        reportFailure()
+    }
+
     private fun hideErrorDocument(view: WebView) {
-        // Compose가 그려지기 전에 기본 오류 문서를 숨깁니다. 보안 오류는 별도 대응 범위입니다.
-        if (failure?.error == SessionLoadError.SECURITY) {
-            view.visibility = View.VISIBLE
-        } else if (!documentTracker.hasVisibleDocument) {
+        // Compose가 그려지기 전에 기본 오류 문서를 숨깁니다. 숨김 기준은 오류 화면 판정과 같은 정책을 따릅니다.
+        val current = failure ?: return
+        if (SessionPageRecoveryPolicy.hidesWebView(current)) {
             view.visibility = View.INVISIBLE
         }
     }
@@ -284,7 +332,8 @@ private class RequestedNavigation(
 )
 
 private fun Int.toLoadError(): SessionLoadError = when (this) {
-    WebViewClient.ERROR_FAILED_SSL_HANDSHAKE, WebViewClient.ERROR_UNSAFE_RESOURCE -> SessionLoadError.SECURITY
+    WebViewClient.ERROR_FAILED_SSL_HANDSHAKE -> SessionLoadError.SSL
+    WebViewClient.ERROR_UNSAFE_RESOURCE -> SessionLoadError.UNSAFE_SITE
     WebViewClient.ERROR_BAD_URL, WebViewClient.ERROR_UNSUPPORTED_SCHEME,
     WebViewClient.ERROR_FILE, WebViewClient.ERROR_FILE_NOT_FOUND,
     -> SessionLoadError.UNAVAILABLE

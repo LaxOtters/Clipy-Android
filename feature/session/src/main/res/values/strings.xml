@@ -34,4 +34,8 @@
     <string name="session_recovery_reopen">Reopen page</string>
     <string name="session_recovery_renderer_gone_title">This page stopped responding</string>
     <string name="session_recovery_renderer_gone_description">Reopen the page to continue.</string>
+    <string name="session_recovery_ssl_title">This connection isn’t secure</string>
+    <string name="session_recovery_ssl_description">The site’s security certificate couldn’t be verified.</string>
+    <string name="session_recovery_unsafe_site_title">This site may be unsafe</string>
+    <string name="session_recovery_unsafe_site_description">This site was flagged as potentially dangerous.</string>
 </resources>
