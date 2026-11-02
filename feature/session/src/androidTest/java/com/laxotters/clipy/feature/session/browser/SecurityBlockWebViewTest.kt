@@ -69,9 +69,16 @@ class SecurityBlockWebViewTest {
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.url.encodedPath) {
+                "/redirect" ->
+                    MockResponse.Builder()
+                        .code(302)
+                        .addHeader("Location", untrusted.url("/bad").toString())
+                        .build()
+
                 "/mixed" -> html("""<p>Usable</p><img src="${untrusted.url("/image.png")}">""")
                 else -> html(
-                    """<a id="secure" style="display:block;padding:48px" href="${untrusted.url("/bad")}">Secure</a>""",
+                    """<a id="secure" style="display:block;padding:48px" href="${untrusted.url("/bad")}">Secure</a>""" +
+                        """<a id="redirect" style="display:block;padding:48px" href="/redirect">Redirect</a>""",
                 )
             }
         }
@@ -125,6 +132,29 @@ class SecurityBlockWebViewTest {
 
         composeRule.onNodeWithText("Go home").performClick()
         assertEquals(1, homeRequests.get())
+    }
+
+    @Test
+    fun sslRedirectFirstLoad_blocksRedirectTargetAndOffersHome() {
+        launchBrowser(server.url("/redirect").toString(), waitForUrl = false)
+        waitForText("This connection isn’t secure")
+        composeRule.onNodeWithText("Go home").assertIsDisplayed()
+        assertEquals(0, untrustedRequests.get())
+    }
+
+    @Test
+    fun sslRedirectFromLink_blocksAndGoBackShowsSamePage() {
+        val start = server.url("/start").toString()
+        launchBrowser(start)
+        val webView = currentWebView()
+
+        composeRule.runOnIdle { webView.evaluateJavascript("document.getElementById('redirect').click()", null) }
+
+        waitForText("This connection isn’t secure")
+        assertEquals(0, untrustedRequests.get())
+        composeRule.onNodeWithText("Go back").performClick()
+        composeRule.waitUntil(TIMEOUT) { browserState.get().pageRecovery == null }
+        assertEquals(start, browserState.get().currentUrl)
     }
 
     @Test

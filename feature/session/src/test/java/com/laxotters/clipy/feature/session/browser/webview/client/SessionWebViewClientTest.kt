@@ -136,6 +136,18 @@ class SessionWebViewClientTest {
     }
 
     @Test
+    fun redirectedMainFrameSslError_blocksRedirectTarget() {
+        showDocument("https://example.com/previous")
+        client.shouldOverrideUrlLoading(view, request(url = "https://example.com/redirect"))
+        client.shouldOverrideUrlLoading(view, request(redirect = true))
+        val handler = sslHandler()
+        client.onReceivedSslError(view, handler, SslError(SslError.SSL_UNTRUSTED, certificate(), URL))
+        assertTrue(shadowOf(handler).wasCancelCalled())
+        assertEquals(SessionLoadError.SSL, failures.single().error)
+        assertEquals(URL, failures.single().navigation.url)
+    }
+
+    @Test
     fun firstLoadSslError_hidesErrorDocument() {
         client.onReceivedSslError(view, sslHandler(), SslError(SslError.SSL_EXPIRED, certificate(), URL))
         assertEquals(SessionLoadError.SSL, failures.single().error)
@@ -303,10 +315,11 @@ class SessionWebViewClientTest {
         mainFrame: Boolean = true,
         method: String = "GET",
         url: String = URL,
+        redirect: Boolean = false,
     ) = object : WebResourceRequest {
         override fun getUrl(): Uri = Uri.parse(url)
         override fun isForMainFrame() = mainFrame
-        override fun isRedirect() = false
+        override fun isRedirect() = redirect
         override fun hasGesture() = false
         override fun getMethod() = method
         override fun getRequestHeaders(): Map<String, String> = emptyMap()
