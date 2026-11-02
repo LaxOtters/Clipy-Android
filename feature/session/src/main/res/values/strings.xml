@@ -19,4 +19,16 @@
     <string name="session_external_action_continue">Continue</string>
     <string name="session_external_app_failure_message">Couldn\'t open external app</string>
     <string name="session_download_unsupported_message">Downloads aren\'t supported</string>
+    <string name="session_page_load_failure_message">Couldn\'t load this page</string>
+    <string name="session_recovery_try_again">Try again</string>
+    <string name="session_recovery_go_back">Go back</string>
+    <string name="session_recovery_go_home">Go home</string>
+    <string name="session_recovery_no_network_title">No internet connection</string>
+    <string name="session_recovery_no_network_description">Check your network connection and try again.</string>
+    <string name="session_recovery_server_title">Something went wrong on this site</string>
+    <string name="session_recovery_server_description">Please try again in a few moments.</string>
+    <string name="session_recovery_unknown_title">Couldn’t load this page</string>
+    <string name="session_recovery_unknown_description">An unexpected error occurred while loading this page.</string>
+    <string name="session_recovery_unavailable_title">This page can\'t be opened</string>
+    <string name="session_recovery_unavailable_description">The page may be unavailable or unsupported.</string>
 </resources>

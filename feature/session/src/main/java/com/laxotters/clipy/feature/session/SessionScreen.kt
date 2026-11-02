@@ -54,6 +54,7 @@ fun SessionRoute(
             state = browserState,
             initialUrl = state.initialUrl,
             onPageFinished = { viewModel.dispatch(SessionUiEvent.PageLoaded(state.sessionId)) },
+            onHomeRequested = navigateToHome,
             onRootScrolled = { metrics ->
                 viewModel.dispatch(
                     SessionUiEvent.WebViewRootScrolled(
