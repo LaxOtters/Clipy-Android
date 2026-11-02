@@ -11,7 +11,8 @@ internal class SessionWebViewRelease(
     private val removeFromParent: () -> Unit,
     private val destroy: () -> Unit,
 ) {
-    private var isReleased = false
+    var isReleased = false
+        private set
 
     @MainThread
     fun release() {

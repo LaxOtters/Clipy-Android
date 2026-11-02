@@ -97,6 +97,73 @@ class SessionBrowserRecoveryTest {
         assertTrue(state.pageRecovery!!.showOverlay)
     }
 
+    @Test
+    fun rendererGone_offersReopenForLastPageAndBlocksHistoryNavigation() {
+        state.onPageLoadChanged(SessionPageLoad.Loading(SessionPageNavigation(1, 1, "https://example.com/page")))
+        state.updatePageInfo(PageInfo("https://example.com/page", true, true))
+        state.onRenderProcessGone(1)
+        val recovery = state.pageRecovery!!
+        assertEquals(SessionPageErrorCause.RENDERER_GONE, recovery.cause)
+        assertEquals(SessionRecoveryAction.REOPEN, recovery.action)
+        assertEquals("https://example.com/page", recovery.navigation.url)
+        assertTrue(recovery.showOverlay)
+        assertFalse(state.canGoBack)
+        assertFalse(state.canGoForward)
+    }
+
+    @Test
+    fun rendererGoneWithoutAnyUrl_offersHome() {
+        val state = SessionBrowserState({ null })
+        state.onRenderProcessGone(1)
+        assertEquals(SessionRecoveryAction.GO_HOME, state.pageRecovery!!.action)
+    }
+
+    @Test
+    fun reopen_createsOneNewWebViewAndKeepsOverlayUntilItIsReady() {
+        state.onRenderProcessGone(1)
+        val target = state.pageRecovery!!.navigation
+        repeat(3) { state.performRecovery(target) { error("Reopen must not request Home") } }
+        assertEquals(1, state.webViewGeneration)
+        assertEquals("https://example.com", state.reopenUrl)
+        val reopened = SessionPageNavigation(2, 1, "https://example.com")
+        state.onPageLoadChanged(SessionPageLoad.Loading(reopened))
+        assertEquals(SessionPageErrorCause.RENDERER_GONE, state.pageRecovery!!.cause)
+        assertTrue(state.pageRecovery!!.isRunning)
+        state.onPageLoadChanged(SessionPageLoad.Ready(reopened))
+        assertNull(state.pageRecovery)
+    }
+
+    @Test
+    fun reopenLoadFailure_followsPageLoadPolicy() {
+        state.onRenderProcessGone(1)
+        state.performRecovery(state.pageRecovery!!.navigation) {}
+        val reopened = SessionPageNavigation(2, 1, "https://example.com")
+        state.onPageLoadChanged(SessionPageLoad.Loading(reopened))
+        fail(reopened, network = SessionNetworkAvailability.UNAVAILABLE)
+        assertEquals(SessionPageErrorCause.NO_NETWORK, state.pageRecovery!!.cause)
+        assertEquals(SessionRecoveryAction.TRY_AGAIN, state.pageRecovery!!.action)
+    }
+
+    @Test
+    fun repeatedRendererGone_offersReopenAgain() {
+        state.onRenderProcessGone(1)
+        state.performRecovery(state.pageRecovery!!.navigation) {}
+        state.onPageLoadChanged(SessionPageLoad.Loading(SessionPageNavigation(2, 1, "https://example.com")))
+        state.onRenderProcessGone(2)
+        assertEquals(SessionRecoveryAction.REOPEN, state.pageRecovery!!.action)
+        assertFalse(state.pageRecovery!!.isRunning)
+        state.performRecovery(state.pageRecovery!!.navigation) {}
+        assertEquals(2, state.webViewGeneration)
+    }
+
+    @Test
+    fun reloadWhileRendererGone_reopensInsteadOfReloading() {
+        state.onRenderProcessGone(1)
+        state.reload()
+        assertEquals(1, state.webViewGeneration)
+        assertTrue(state.pageRecovery!!.isRunning)
+    }
+
     private fun fail(
         navigation: SessionPageNavigation,
         error: SessionLoadError = SessionLoadError.CONNECTION,

@@ -3,6 +3,7 @@ package com.laxotters.clipy.feature.session.browser
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -23,6 +24,14 @@ internal class SessionBrowserState(
         private set
     private var currentNavigation: SessionPageNavigation? = null
 
+    /** 값이 바뀌면 Browser가 새 WebView 인스턴스를 만듭니다. */
+    internal var webViewGeneration: Int by mutableIntStateOf(0)
+        private set
+
+    /** renderer 종료 뒤 새 WebView가 처음 열 URL입니다. 없으면 Session의 시작 URL을 엽니다. */
+    internal var reopenUrl: String? by mutableStateOf(null)
+        private set
+
     val currentUrl: String get() = pageInfo?.url.orEmpty()
     val urlLabel: String get() = formatUrlLabel(pageInfo?.url ?: initialUrl().orEmpty())
     val canGoBack: Boolean get() = pageInfo?.canGoBack == true
@@ -33,13 +42,36 @@ internal class SessionBrowserState(
 
     fun goForward() = controller.goForward()
 
-    fun reload() = controller.reload()
+    fun reload() {
+        val recovery = pageRecovery
+        // 종료된 WebView는 새로고침할 수 없어 새 WebView로 다시 엽니다.
+        if (recovery?.cause == SessionPageErrorCause.RENDERER_GONE) {
+            if (recovery.action == SessionRecoveryAction.REOPEN) {
+                performRecovery(recovery.navigation) {}
+            }
+            return
+        }
+        controller.reload()
+    }
+
+    internal fun onRenderProcessGone(webViewId: Long) {
+        // 새 WebView에는 이전 방문 기록이 없으므로 뒤로·앞으로 이동을 막습니다.
+        pageInfo = pageInfo?.copy(canGoBack = false, canGoForward = false)
+        val url = pageInfo?.url?.takeIf { it.isNotBlank() } ?: initialUrl()
+        pageRecovery = SessionPageRecovery(
+            navigation = SessionPageNavigation(webViewId, currentNavigation?.navigationId ?: 0L, url.orEmpty()),
+            cause = SessionPageErrorCause.RENDERER_GONE,
+            action = if (url != null) SessionRecoveryAction.REOPEN else SessionRecoveryAction.GO_HOME,
+            showOverlay = true,
+        )
+        currentNavigation = null
+    }
 
     internal fun onPageLoadChanged(load: SessionPageLoad) {
         val navigation = load.navigation
         val isTerminal = load is SessionPageLoad.Ready || load is SessionPageLoad.Stopped
         if (isTerminal && navigation != currentNavigation) return
-        if (navigation.webViewId != currentNavigation?.webViewId) {
+        if (navigation.webViewId != currentNavigation?.webViewId && !isReopening(navigation)) {
             pageInfo = null
             pageRecovery = null
         }
@@ -73,10 +105,23 @@ internal class SessionBrowserState(
                 onHomeRequested()
                 true
             }
+            SessionRecoveryAction.REOPEN -> {
+                reopenUrl = recovery.navigation.url
+                webViewGeneration += 1
+                true
+            }
         }
         if (!accepted && pageRecovery == running) {
             pageRecovery = recovery
         }
+    }
+
+    /** 새 WebView가 본문을 표시할 때까지 renderer 종료 화면을 유지합니다. */
+    private fun isReopening(navigation: SessionPageNavigation): Boolean {
+        val recovery = pageRecovery ?: return false
+        return recovery.cause == SessionPageErrorCause.RENDERER_GONE &&
+            recovery.isRunning &&
+            navigation.webViewId != recovery.navigation.webViewId
     }
 
     internal fun dismissRecoverySnackbar() {
@@ -93,6 +138,7 @@ internal class SessionBrowserState(
         pageInfo = null
         pageRecovery = null
         currentNavigation = null
+        reopenUrl = null
     }
 }
 
@@ -158,12 +204,14 @@ internal enum class SessionPageErrorCause {
     SERVER,
     UNKNOWN,
     UNAVAILABLE,
+    RENDERER_GONE,
 }
 
 internal enum class SessionRecoveryAction {
     TRY_AGAIN,
     GO_BACK,
     GO_HOME,
+    REOPEN,
 }
 
 internal data class SessionPageRecovery(

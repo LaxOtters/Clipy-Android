@@ -31,4 +31,7 @@
     <string name="session_recovery_unknown_description">An unexpected error occurred while loading this page.</string>
     <string name="session_recovery_unavailable_title">This page can\'t be opened</string>
     <string name="session_recovery_unavailable_description">The page may be unavailable or unsupported.</string>
+    <string name="session_recovery_reopen">Reopen page</string>
+    <string name="session_recovery_renderer_gone_title">This page stopped responding</string>
+    <string name="session_recovery_renderer_gone_description">Reopen the page to continue.</string>
 </resources>

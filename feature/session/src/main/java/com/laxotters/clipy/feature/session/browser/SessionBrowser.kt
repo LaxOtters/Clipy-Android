@@ -46,32 +46,36 @@ internal fun SessionBrowser(
         }
 
         Box(modifier) {
-            SessionWebView(
-                url = initialUrl,
-                controller = state.controller,
-                dialogState = dialogState,
-                callbacks = SessionWebViewCallbacks(
-                    onPageFinished = { pageInfo ->
-                        state.updatePageInfo(pageInfo)
-                        onPageFinished()
-                    },
-                    onRootScrolled = onRootScrolled,
-                    onPageLoadChanged = state::onPageLoadChanged,
-                    onHistoryChanged = state::updatePageInfo,
-                    onErrorMessage = { message ->
-                        scope.launch {
-                            snackbarController.showSnackbar(
-                                message = message.message,
-                                icon = ClipySnackbarIcon.Error,
-                                key = message.key,
-                            )
-                        }
-                    },
-                ),
-                externalAppHandlerFactory = externalAppHandlerFactory,
-                networkAvailability = networkReader::snapshot,
-                modifier = Modifier.fillMaxSize(),
-            )
+            // renderer가 종료되면 이전 인스턴스를 재사용하지 않고 세대마다 새 WebView를 만듭니다.
+            key(state.webViewGeneration) {
+                SessionWebView(
+                    url = state.reopenUrl ?: initialUrl,
+                    controller = state.controller,
+                    dialogState = dialogState,
+                    callbacks = SessionWebViewCallbacks(
+                        onPageFinished = { pageInfo ->
+                            state.updatePageInfo(pageInfo)
+                            onPageFinished()
+                        },
+                        onRootScrolled = onRootScrolled,
+                        onPageLoadChanged = state::onPageLoadChanged,
+                        onHistoryChanged = state::updatePageInfo,
+                        onErrorMessage = { message ->
+                            scope.launch {
+                                snackbarController.showSnackbar(
+                                    message = message.message,
+                                    icon = ClipySnackbarIcon.Error,
+                                    key = message.key,
+                                )
+                            }
+                        },
+                        onRenderProcessGone = state::onRenderProcessGone,
+                    ),
+                    externalAppHandlerFactory = externalAppHandlerFactory,
+                    networkAvailability = networkReader::snapshot,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             SessionRecoveryContent(state, onHomeRequested)
         }
         SessionWebDialogHosts(state = dialogState)

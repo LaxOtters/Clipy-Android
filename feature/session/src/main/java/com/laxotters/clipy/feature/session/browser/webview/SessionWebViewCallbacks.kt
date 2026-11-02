@@ -8,6 +8,7 @@ internal class SessionWebViewCallbacks(
     val onErrorMessage: (ErrorMessage) -> Unit = {},
     val onPageLoadChanged: (SessionPageLoad) -> Unit = {},
     val onHistoryChanged: (PageInfo) -> Unit = {},
+    val onRenderProcessGone: (webViewId: Long) -> Unit = {},
 )
 
 internal data class ErrorMessage(

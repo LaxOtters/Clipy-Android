@@ -75,11 +75,16 @@ internal fun SessionRecoveryOverlay(
         SessionPageErrorCause.UNAVAILABLE ->
             R.string.session_recovery_unavailable_title to
                 R.string.session_recovery_unavailable_description
+
+        SessionPageErrorCause.RENDERER_GONE ->
+            R.string.session_recovery_renderer_gone_title to
+                R.string.session_recovery_renderer_gone_description
     }
     val label = when (recovery.action) {
         SessionRecoveryAction.TRY_AGAIN -> R.string.session_recovery_try_again
         SessionRecoveryAction.GO_BACK -> R.string.session_recovery_go_back
         SessionRecoveryAction.GO_HOME -> R.string.session_recovery_go_home
+        SessionRecoveryAction.REOPEN -> R.string.session_recovery_reopen
         null -> null
     }
     ClipyErrorOverlay(
@@ -110,13 +115,26 @@ internal class SessionRecoveryPreviewProvider : PreviewParameterProvider<Session
     override val values: Sequence<SessionPageRecovery> = sequence {
         val navigation = SessionPageNavigation(1, 1, "https://example.com")
         SessionPageErrorCause.entries.forEach { cause ->
-            val actions = if (cause == SessionPageErrorCause.UNAVAILABLE) {
-                listOf(SessionRecoveryAction.GO_BACK, SessionRecoveryAction.GO_HOME)
-            } else {
-                SessionRecoveryAction.entries
+            val actions = when (cause) {
+                SessionPageErrorCause.UNAVAILABLE ->
+                    listOf(SessionRecoveryAction.GO_BACK, SessionRecoveryAction.GO_HOME)
+
+                SessionPageErrorCause.RENDERER_GONE ->
+                    listOf(SessionRecoveryAction.REOPEN, SessionRecoveryAction.GO_HOME)
+
+                else -> SessionRecoveryAction.entries - SessionRecoveryAction.REOPEN
             }
             actions.forEach { action -> yield(SessionPageRecovery(navigation, cause, action, true)) }
         }
+        yield(
+            SessionPageRecovery(
+                navigation,
+                SessionPageErrorCause.RENDERER_GONE,
+                SessionRecoveryAction.REOPEN,
+                true,
+                true,
+            ),
+        )
         yield(
             SessionPageRecovery(
                 navigation,
