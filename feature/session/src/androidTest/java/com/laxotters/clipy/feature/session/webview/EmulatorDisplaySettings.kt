@@ -1,6 +1,7 @@
 package com.laxotters.clipy.feature.session.webview
 
 import android.app.Instrumentation
+import android.os.Build
 import java.io.FileInputStream
 
 /** emulator의 최초 표시 설정을 보관하고 테스트 변경과 복원을 한 경로로 관리합니다. */
@@ -12,7 +13,11 @@ internal class EmulatorDisplaySettings(
     private val originalDensityOverride = readDensityOverride("Override density")
     private val physicalDensity = checkNotNull(readDensityOverride("Physical density"))
     private val originalFontScale = readSetting(SYSTEM_SETTINGS, FONT_SCALE)
-    private val originalFontWeightAdjustment = readSetting(SECURE_SETTINGS, FONT_WEIGHT_ADJUSTMENT)
+    private val originalFontWeightAdjustment = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        readSetting(SECURE_SETTINGS, FONT_WEIGHT_ADJUSTMENT)
+    } else {
+        null
+    }
 
     val changedWindowSize: DisplaySize = DisplaySize(
         width = (currentWindowSize().width * WINDOW_SIZE_SCALE).toInt(),
@@ -71,7 +76,9 @@ internal class EmulatorDisplaySettings(
         restoreWindowSize()
         restoreDensity()
         restoreFontScale()
-        restoreFontWeightAdjustment()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            restoreFontWeightAdjustment()
+        }
     }
 
     private fun currentWindowSize(): DisplaySize = originalSizeOverride ?: physicalSize

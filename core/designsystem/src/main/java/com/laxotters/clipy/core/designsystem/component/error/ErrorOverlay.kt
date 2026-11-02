@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName")
+
 package com.laxotters.clipy.core.designsystem.component.error
 
 import androidx.compose.foundation.Image

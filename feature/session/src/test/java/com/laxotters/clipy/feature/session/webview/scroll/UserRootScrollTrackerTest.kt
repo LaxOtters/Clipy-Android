@@ -1,4 +1,4 @@
-package com.laxotters.clipy.feature.session.webview
+package com.laxotters.clipy.feature.session.webview.scroll
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

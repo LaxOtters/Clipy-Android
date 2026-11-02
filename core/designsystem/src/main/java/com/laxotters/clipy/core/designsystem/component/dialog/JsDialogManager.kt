@@ -12,16 +12,17 @@ import androidx.compose.ui.Modifier
 import com.laxotters.clipy.core.designsystem.component.ClipyTextAction
 import com.laxotters.clipy.core.designsystem.component.ClipyTextInputAction
 
-/** Route 수명에서 한 번에 하나의 JS Dialog 요청만 수락하고 표시를 중재합니다. */
+/** 소유자 수명 안에서 하나의 JS Dialog 요청만 수락하고 표시를 중재합니다. */
 @Stable
 class ClipyJsDialogManager internal constructor() {
     internal var activeRequestEntry: JsDialogRequestEntry? by mutableStateOf(null)
         private set
+    private var isCancelling = false
 
     /** 표시 중인 요청이 없을 때만 요청을 수락하고, 수락 여부를 반환합니다. */
     @MainThread
-    fun show(request: ClipyJsDialogRequest): Boolean {
-        if (activeRequestEntry != null) {
+    fun show(request: JsDialogRequest): Boolean {
+        if (isCancelling || activeRequestEntry != null) {
             return false
         }
 
@@ -29,33 +30,53 @@ class ClipyJsDialogManager internal constructor() {
         return true
     }
 
-    /** 현재 요청만 완료하고, action 실행 뒤 표시 슬롯을 비웁니다. */
+    /** 현재 요청을 수명주기 종료로 취소합니다. 취소 중 발생한 후속 요청은 수락하지 않습니다. */
+    @MainThread
+    fun cancelActive() {
+        if (isCancelling) return
+        val requestEntry = activeRequestEntry ?: return
+
+        isCancelling = true
+        try {
+            requestEntry.request.onCancel()
+        } finally {
+            if (activeRequestEntry === requestEntry) {
+                activeRequestEntry = null
+            }
+            isCancelling = false
+        }
+    }
+
+    /** 소유자가 넘긴 요청이 현재 요청일 때만 취소하여 다른 WebView의 요청을 보호합니다. */
+    @MainThread
+    fun cancelActive(request: JsDialogRequest) {
+        if (activeRequestEntry?.request === request) {
+            cancelActive()
+        }
+    }
+
+    /** 현재 사용자 응답을 완료합니다. 응답이 만든 후속 요청을 받을 수 있도록 action 전에 슬롯을 비웁니다. */
     @MainThread
     internal fun complete(
         requestEntry: JsDialogRequestEntry,
         action: () -> Unit,
     ) {
         // 현재 표시 요청과 무관한 이전 action은 처리하지 않습니다.
-        if (activeRequestEntry !== requestEntry) {
+        if (isCancelling || activeRequestEntry !== requestEntry) {
             return
         }
 
-        try {
-            action()
-        } finally {
-            if (activeRequestEntry === requestEntry) {
-                activeRequestEntry = null
-            }
-        }
+        activeRequestEntry = null
+        action()
     }
 }
 
 /** Host가 표시하는 JS Dialog 요청 한 건의 상태와 action 수명을 구분합니다. */
 internal class JsDialogRequestEntry(
-    val request: ClipyJsDialogRequest,
+    val request: JsDialogRequest,
 )
 
-/** Manager가 수락한 현재 JS Dialog 요청을 표시하고, action 실행 뒤 요청을 완료합니다. */
+/** Manager가 수락한 현재 JS Dialog 요청을 표시하고, 사용자 응답을 한 번만 완료합니다. */
 @Composable
 fun ClipyJsDialogHost(
     manager: ClipyJsDialogManager,
@@ -67,10 +88,10 @@ fun ClipyJsDialogHost(
     // 요청이 바뀌면 Dialog 내부 입력값과 스크롤 상태를 새로 생성합니다.
     key(requestEntry) {
         when (request) {
-            is ClipyJsDialogRequest.Alert -> {
+            is JsDialogRequest.Alert -> {
                 ClipyJsDialog(
                     source = request.source,
-                    state = ClipyJsDialogState.Alert(
+                    state = JsDialogState.Alert(
                         title = request.title,
                         description = request.description,
                         confirmAction = request.confirmAction.withCompletion(
@@ -82,10 +103,10 @@ fun ClipyJsDialogHost(
                 )
             }
 
-            is ClipyJsDialogRequest.Confirm -> {
+            is JsDialogRequest.Confirm -> {
                 ClipyJsDialog(
                     source = request.source,
-                    state = ClipyJsDialogState.Confirm(
+                    state = JsDialogState.Confirm(
                         title = request.title,
                         description = request.description,
                         confirmAction = request.confirmAction.withCompletion(
@@ -101,10 +122,10 @@ fun ClipyJsDialogHost(
                 )
             }
 
-            is ClipyJsDialogRequest.Prompt -> {
+            is JsDialogRequest.Prompt -> {
                 ClipyJsDialog(
                     source = request.source,
-                    state = ClipyJsDialogState.Prompt(
+                    state = JsDialogState.Prompt(
                         title = request.title,
                         description = request.description,
                         initialValue = request.initialValue,
@@ -129,18 +150,20 @@ fun rememberClipyJsDialogManager(): ClipyJsDialogManager = remember {
     ClipyJsDialogManager()
 }
 
-/** JS Dialog에 표시할 콘텐츠와 웹 요청에 돌려줄 action을 정의합니다. */
-sealed interface ClipyJsDialogRequest {
+/** JS Dialog의 표시 내용, 사용자 action과 수명주기 취소 동작을 정의합니다. */
+sealed interface JsDialogRequest {
     val source: String
     val title: String
     val description: String
+    val onCancel: () -> Unit
 
     data class Alert(
         override val source: String,
         override val title: String,
         override val description: String,
         val confirmAction: ClipyTextAction,
-    ) : ClipyJsDialogRequest
+        override val onCancel: () -> Unit,
+    ) : JsDialogRequest
 
     data class Confirm(
         override val source: String,
@@ -148,7 +171,10 @@ sealed interface ClipyJsDialogRequest {
         override val description: String,
         val confirmAction: ClipyTextAction,
         val cancelAction: ClipyTextAction,
-    ) : ClipyJsDialogRequest
+    ) : JsDialogRequest {
+        override val onCancel: () -> Unit
+            get() = cancelAction.onClick
+    }
 
     data class Prompt(
         override val source: String,
@@ -157,7 +183,10 @@ sealed interface ClipyJsDialogRequest {
         val initialValue: String,
         val confirmAction: ClipyTextInputAction,
         val cancelAction: ClipyTextAction,
-    ) : ClipyJsDialogRequest
+    ) : JsDialogRequest {
+        override val onCancel: () -> Unit
+            get() = cancelAction.onClick
+    }
 }
 
 private fun ClipyTextAction.withCompletion(

@@ -4,14 +4,23 @@ import android.app.UiModeManager
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.webkit.WebView
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.UiController
@@ -28,6 +37,8 @@ import androidx.test.filters.LargeTest
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
+import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogHost
+import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
 import com.laxotters.clipy.core.navigation.Route
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.SessionTopBarState
@@ -38,6 +49,7 @@ import org.hamcrest.CoreMatchers.containsString
 import org.hamcrest.Matcher
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -45,7 +57,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @LargeTest
-@SdkSuppress(minSdkVersion = 31)
 @RunWith(AndroidJUnit4::class)
 class SessionConfigurationContinuityTest {
     @get:Rule
@@ -57,6 +68,7 @@ class SessionConfigurationContinuityTest {
     private var originalNightMode = UiModeManager.MODE_NIGHT_NO
     private var originalRequestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     private var originalOrientation = Configuration.ORIENTATION_UNDEFINED
+    private var nightModeChanged = false
 
     @Before
     fun setUp() {
@@ -83,11 +95,25 @@ class SessionConfigurationContinuityTest {
         composeRule.activityRule.scenario.onActivity {
             it.requestedOrientation = originalRequestedOrientation
         }
-        uiModeManager.setApplicationNightMode(originalNightMode)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && nightModeChanged) {
+            uiModeManager.setApplicationNightMode(originalNightMode)
+        }
     }
 
     @Test
     fun configurationChanges_keepActivityWebViewDomHistoryScrollAndChrome() {
+        verifyBrowsingConfigurationChanges(::configurationChanges)
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 31)
+    fun nightModeAndFontWeightChanges_keepActivityWebViewDomHistoryScrollAndChrome() {
+        verifyBrowsingConfigurationChanges(::api31ConfigurationChanges)
+    }
+
+    private fun verifyBrowsingConfigurationChanges(
+        scenarios: (Configuration) -> List<ConfigurationChange>,
+    ) {
         val initialUrl = htmlDataUrl(
             """
             <button id="draft" onclick="this.textContent='kept'">before</button>
@@ -112,38 +138,127 @@ class SessionConfigurationContinuityTest {
         val beforeChange = currentWebViewState()
         val originalConfiguration = Configuration(composeRule.activity.resources.configuration)
 
-        verifyConfigurationRoundTrip(
-            activityIdentity = activityIdentity,
-            expectedWebViewState = beforeChange,
-            change = ::changeOrientation,
-            changed = {
-                composeRule.activity.resources.configuration.orientation != originalOrientation
-            },
-            restore = ::restoreOrientation,
-            restored = {
-                composeRule.activity.resources.configuration.orientation == originalOrientation
-            },
+        scenarios(originalConfiguration).forEach { scenario ->
+            verifyConfigurationRoundTrip(activityIdentity, beforeChange, scenario)
+        }
+    }
+
+    @Test
+    fun configurationChanges_keepJavaScriptDialogAndPendingResult() {
+        verifyDialogConfigurationChanges(::configurationChanges)
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 31)
+    fun nightModeAndFontWeightChanges_keepJavaScriptDialogAndPendingResult() {
+        verifyDialogConfigurationChanges(::api31ConfigurationChanges)
+    }
+
+    @Test
+    fun configurationFailure_preservesChangeAndRestoreCauses() {
+        val changeFailure = IllegalStateException("change failure")
+        val restoreFailure = IllegalArgumentException("restore failure")
+
+        val failure = runCatching {
+            verifyConfigurationPhases(
+                name = "orientation",
+                change = { throw changeFailure },
+                restore = { throw restoreFailure },
+            )
+        }.exceptionOrNull()
+
+        assertEquals("orientation: change/verify failed", failure?.message)
+        assertSame(changeFailure, failure?.cause)
+        val suppressed = checkNotNull(failure).suppressed.single()
+        assertEquals("orientation: restore/verify failed", suppressed.message)
+        assertSame(restoreFailure, suppressed.cause)
+    }
+
+    @Test
+    fun configurationRestoreFailure_reportsRestorePhase() {
+        val restoreFailure = IllegalStateException("restore failure")
+
+        val failure = runCatching {
+            verifyConfigurationPhases(
+                name = "density",
+                change = {},
+                restore = { throw restoreFailure },
+            )
+        }.exceptionOrNull()
+
+        assertEquals("density: restore/verify failed", failure?.message)
+        assertSame(restoreFailure, failure?.cause)
+    }
+
+    private fun verifyDialogConfigurationChanges(
+        scenarios: (Configuration) -> List<ConfigurationChange>,
+    ) {
+        val pageState = launchWebView("about:blank")
+        val webView = currentWebView()
+        startJavascript(
+            "document.title = 'pending'; var result = prompt('Configuration prompt', 'Initial'); " +
+                "document.title = result === null ? 'cancelled' : result",
+        )
+        assertDialogDisplayed()
+        composeRule.onNodeWithText("Initial").performTextReplacement("Retained input")
+
+        val activityIdentity = System.identityHashCode(composeRule.activity)
+        val originalConfiguration = Configuration(composeRule.activity.resources.configuration)
+
+        scenarios(originalConfiguration).forEach { scenario ->
+            verifyDialogConfigurationRoundTrip(activityIdentity, webView, scenario)
+        }
+
+        composeRule.onNodeWithText("Confirm").performClick()
+        composeRule.waitUntil(timeoutMillis = PAGE_LOAD_TIMEOUT_MILLIS) {
+            currentWebViewTitle(webView) == "Retained input"
+        }
+        assertTrue(pageState.get().url.isNotEmpty())
+    }
+
+    private fun configurationChanges(originalConfiguration: Configuration): List<ConfigurationChange> =
+        listOf(
+            orientationChange(),
+            windowSizeChange(originalConfiguration),
+            fontScaleChange(originalConfiguration),
+            densityChange(originalConfiguration),
         )
 
-        verifyConfigurationRoundTrip(
-            activityIdentity = activityIdentity,
-            expectedWebViewState = beforeChange,
-            change = { displaySettings.setWindowSize(displaySettings.changedWindowSize) },
-            changed = {
-                composeRule.activity.resources.configuration.screenWidthDp !=
-                    originalConfiguration.screenWidthDp
-            },
-            restore = displaySettings::restoreWindowSize,
-            restored = {
-                composeRule.activity.resources.configuration.screenWidthDp ==
-                    originalConfiguration.screenWidthDp
-            },
-        )
+    @RequiresApi(31)
+    private fun api31ConfigurationChanges(originalConfiguration: Configuration): List<ConfigurationChange> =
+        listOf(nightModeChange(originalConfiguration), fontWeightChange(originalConfiguration))
 
+    private fun orientationChange(): ConfigurationChange = ConfigurationChange(
+        name = "orientation",
+        change = ::changeOrientation,
+        changed = {
+            composeRule.activity.resources.configuration.orientation != originalOrientation
+        },
+        restore = ::restoreOrientation,
+        restored = {
+            composeRule.activity.resources.configuration.orientation == originalOrientation
+        },
+    )
+
+    private fun windowSizeChange(originalConfiguration: Configuration): ConfigurationChange = ConfigurationChange(
+        name = "windowSize",
+        change = { displaySettings.setWindowSize(displaySettings.changedWindowSize) },
+        changed = {
+            composeRule.activity.resources.configuration.screenWidthDp !=
+                originalConfiguration.screenWidthDp
+        },
+        restore = displaySettings::restoreWindowSize,
+        restored = {
+            composeRule.activity.resources.configuration.screenWidthDp ==
+                originalConfiguration.screenWidthDp
+        },
+    )
+
+    @RequiresApi(31)
+    private fun nightModeChange(originalConfiguration: Configuration): ConfigurationChange {
         val originalUiMode = originalConfiguration.uiMode and Configuration.UI_MODE_NIGHT_MASK
-        verifyConfigurationRoundTrip(
-            activityIdentity = activityIdentity,
-            expectedWebViewState = beforeChange,
+        return ConfigurationChange(
+            name = "nightMode",
             change = ::changeNightMode,
             changed = {
                 composeRule.activity.resources.configuration.uiMode and
@@ -155,11 +270,12 @@ class SessionConfigurationContinuityTest {
                     Configuration.UI_MODE_NIGHT_MASK == originalUiMode
             },
         )
+    }
 
+    private fun fontScaleChange(originalConfiguration: Configuration): ConfigurationChange {
         val targetFontScale = if (originalConfiguration.fontScale < 1.1f) 1.15f else 1f
-        verifyConfigurationRoundTrip(
-            activityIdentity = activityIdentity,
-            expectedWebViewState = beforeChange,
+        return ConfigurationChange(
+            name = "fontScale",
             change = { displaySettings.setFontScale(targetFontScale) },
             changed = {
                 composeRule.activity.resources.configuration.fontScale.isCloseTo(targetFontScale)
@@ -170,15 +286,17 @@ class SessionConfigurationContinuityTest {
                     .isCloseTo(originalConfiguration.fontScale)
             },
         )
+    }
 
+    @RequiresApi(31)
+    private fun fontWeightChange(originalConfiguration: Configuration): ConfigurationChange {
         val targetFontWeightAdjustment = if (originalConfiguration.fontWeightAdjustment == 300) {
             0
         } else {
             300
         }
-        verifyConfigurationRoundTrip(
-            activityIdentity = activityIdentity,
-            expectedWebViewState = beforeChange,
+        return ConfigurationChange(
+            name = "fontWeight",
             change = {
                 displaySettings.setFontWeightAdjustment(targetFontWeightAdjustment)
             },
@@ -192,22 +310,29 @@ class SessionConfigurationContinuityTest {
                     originalConfiguration.fontWeightAdjustment
             },
         )
-
-        verifyConfigurationRoundTrip(
-            activityIdentity = activityIdentity,
-            expectedWebViewState = beforeChange,
-            change = { displaySettings.setDensity(displaySettings.changedDensity) },
-            changed = {
-                composeRule.activity.resources.configuration.densityDpi ==
-                    displaySettings.changedDensity
-            },
-            restore = displaySettings::restoreDensity,
-            restored = {
-                composeRule.activity.resources.configuration.densityDpi ==
-                    originalConfiguration.densityDpi
-            },
-        )
     }
+
+    private fun densityChange(originalConfiguration: Configuration): ConfigurationChange = ConfigurationChange(
+        name = "density",
+        change = { displaySettings.setDensity(displaySettings.changedDensity) },
+        changed = {
+            composeRule.activity.resources.configuration.densityDpi ==
+                displaySettings.changedDensity
+        },
+        restore = displaySettings::restoreDensity,
+        restored = {
+            composeRule.activity.resources.configuration.densityDpi ==
+                originalConfiguration.densityDpi
+        },
+    )
+
+    private data class ConfigurationChange(
+        val name: String,
+        val change: () -> Unit,
+        val changed: () -> Boolean,
+        val restore: () -> Unit,
+        val restored: () -> Boolean,
+    )
 
     private fun launchWebView(initialUrl: String): AtomicReference<PageState> {
         val pageState = AtomicReference(PageState())
@@ -216,9 +341,12 @@ class SessionConfigurationContinuityTest {
         composeRule.activityRule.scenario.onActivity { activity ->
             activity.setContent {
                 val controller = rememberSessionWebViewController()
+                val dialogManager = rememberClipyJsDialogManager()
+
                 SessionWebView(
                     url = initialUrl,
                     controller = controller,
+                    dialogManager = dialogManager,
                     onPageStateChanged = { url, canGoBack, canGoForward ->
                         pageState.set(PageState(url = url))
                         sessionViewModel.dispatch(
@@ -242,6 +370,7 @@ class SessionConfigurationContinuityTest {
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
+                ClipyJsDialogHost(manager = dialogManager)
             }
         }
 
@@ -283,6 +412,7 @@ class SessionConfigurationContinuityTest {
         }
     }
 
+    @RequiresApi(31)
     private fun changeNightMode() {
         val currentNightMode = composeRule.activity.resources.configuration.uiMode and
             Configuration.UI_MODE_NIGHT_MASK
@@ -297,6 +427,7 @@ class SessionConfigurationContinuityTest {
             UiModeManager.MODE_NIGHT_NO
         }
 
+        nightModeChanged = true
         uiModeManager.setApplicationNightMode(applicationNightMode)
         composeRule.waitUntil(timeoutMillis = CONFIGURATION_TIMEOUT_MILLIS) {
             composeRule.activity.resources.configuration.uiMode and
@@ -331,33 +462,100 @@ class SessionConfigurationContinuityTest {
     private fun verifyConfigurationRoundTrip(
         activityIdentity: Int,
         expectedWebViewState: WebViewState,
-        change: () -> Unit,
-        changed: () -> Boolean,
-        restore: () -> Unit,
-        restored: () -> Boolean,
+        scenario: ConfigurationChange,
     ) {
         setBrowsingChromeHidden()
-        try {
-            change()
-            waitForConfiguration(changed)
-            assertContinuity(
-                activityIdentity = activityIdentity,
-                expectedWebViewState = expectedWebViewState,
-                expectedBottomSheetState = BottomSheetState.HIDDEN,
-                expectedTopBarState = SessionTopBarState.FOLDED,
-            )
-        } finally {
-            setBrowsingChromeMinimized()
-            restore()
-            waitForConfiguration(restored)
-        }
-
-        assertContinuity(
-            activityIdentity = activityIdentity,
-            expectedWebViewState = expectedWebViewState,
-            expectedBottomSheetState = BottomSheetState.MINIMIZED,
-            expectedTopBarState = SessionTopBarState.UNFOLDED,
+        verifyConfigurationPhases(
+            name = scenario.name,
+            change = {
+                scenario.change()
+                waitForConfiguration(scenario.changed)
+                assertContinuity(
+                    activityIdentity = activityIdentity,
+                    expectedWebViewState = expectedWebViewState,
+                    expectedBottomSheetState = BottomSheetState.HIDDEN,
+                    expectedTopBarState = SessionTopBarState.FOLDED,
+                )
+            },
+            restore = {
+                try {
+                    setBrowsingChromeMinimized()
+                } finally {
+                    scenario.restore()
+                }
+                waitForConfiguration(scenario.restored)
+                assertContinuity(
+                    activityIdentity = activityIdentity,
+                    expectedWebViewState = expectedWebViewState,
+                    expectedBottomSheetState = BottomSheetState.MINIMIZED,
+                    expectedTopBarState = SessionTopBarState.UNFOLDED,
+                )
+            },
         )
+    }
+
+    private fun verifyDialogConfigurationRoundTrip(
+        activityIdentity: Int,
+        webView: WebView,
+        scenario: ConfigurationChange,
+    ) {
+        verifyConfigurationPhases(
+            name = scenario.name,
+            change = {
+                scenario.change()
+                waitForConfiguration(scenario.changed)
+                assertDialogContinuity(activityIdentity, webView)
+            },
+            restore = {
+                scenario.restore()
+                waitForConfiguration(scenario.restored)
+                assertDialogContinuity(activityIdentity, webView)
+            },
+        )
+    }
+
+    private fun verifyConfigurationPhases(
+        name: String,
+        change: () -> Unit,
+        restore: () -> Unit,
+    ) {
+        val changeFailure = runCatching(change).exceptionOrNull()?.let {
+            AssertionError("$name: change/verify failed", it)
+        }
+        // 복원도 실패하면 최초 실패를 덮지 않고 추가 예외로 함께 남깁니다.
+        val restoreFailure = runCatching(restore).exceptionOrNull()?.let {
+            AssertionError("$name: restore/verify failed", it)
+        }
+        if (changeFailure != null) {
+            restoreFailure?.let(changeFailure::addSuppressed)
+            throw changeFailure
+        }
+        if (restoreFailure != null) throw restoreFailure
+    }
+
+    private fun assertDialogContinuity(
+        activityIdentity: Int,
+        webView: WebView,
+    ) {
+        assertEquals(activityIdentity, System.identityHashCode(composeRule.activity))
+        composeRule.runOnIdle {
+            assertTrue(webView.isAttachedToWindow)
+        }
+        assertDialogExists()
+        composeRule.onNode(hasSetTextAction()).assertTextEquals("Retained input")
+        assertEquals("pending", currentWebViewTitle(webView))
+    }
+
+    private fun assertDialogExists() {
+        composeRule.onNodeWithText("Enter information").fetchSemanticsNode()
+        composeRule.onNodeWithText("Configuration prompt").fetchSemanticsNode()
+        composeRule.onNodeWithText("Confirm").fetchSemanticsNode()
+    }
+
+    private fun assertDialogDisplayed() {
+        composeRule.onNodeWithText("Enter information").assertIsDisplayed()
+        composeRule.onNodeWithText("Configuration prompt").assertIsDisplayed()
+        composeRule.onNodeWithText("Confirm").assertIsDisplayed()
     }
 
     private fun waitForConfiguration(condition: () -> Boolean) {
@@ -426,6 +624,37 @@ class SessionConfigurationContinuityTest {
         )
     }
 
+    private fun startJavascript(script: String) {
+        onView(isAssignableFrom(WebView::class.java)).perform(
+            webViewAction("start JavaScript") { webView ->
+                webView.evaluateJavascript(script, null)
+            },
+        )
+        composeRule.waitUntil(timeoutMillis = PAGE_LOAD_TIMEOUT_MILLIS) {
+            composeRule.onAllNodesWithText("Configuration prompt")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+    }
+
+    private fun currentWebView(): WebView {
+        val webView = AtomicReference<WebView>()
+        onView(isAssignableFrom(WebView::class.java)).perform(
+            webViewAction("capture the current WebView") { currentWebView ->
+                webView.set(currentWebView)
+            },
+        )
+        return checkNotNull(webView.get())
+    }
+
+    private fun currentWebViewTitle(webView: WebView): String? {
+        val title = AtomicReference<String?>()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            title.set(webView.title)
+        }
+        return title.get()
+    }
+
     private fun scrollWebViewTo(scrollY: Int) {
         onView(isAssignableFrom(WebView::class.java)).perform(
             webViewAction("set the WebView root scroll position") { webView ->
@@ -435,8 +664,6 @@ class SessionConfigurationContinuityTest {
     }
 
     private fun stopFlingAndScrollWebViewTo(scrollY: Int) {
-        // ACTION_DOWN으로 WebView의 남은 fling을 멈추고
-        // ACTION_CANCEL로 입력 추적을 정리한 뒤 기준 scrollY를 설정합니다.
         onView(isAssignableFrom(WebView::class.java)).perform(
             object : ViewAction {
                 override fun getConstraints(): Matcher<View> = isAssignableFrom(WebView::class.java)
@@ -450,10 +677,25 @@ class SessionConfigurationContinuityTest {
                     val eventTime = SystemClock.uptimeMillis()
                     val x = view.width / 2f
                     val y = view.height / 2f
-                    dispatchTouch(view, eventTime, eventTime, MotionEvent.ACTION_DOWN, x, y)
-                    dispatchTouch(view, eventTime, eventTime, MotionEvent.ACTION_CANCEL, x, y)
+                    view.dispatchTouch(eventTime, eventTime, MotionEvent.ACTION_DOWN, x, y)
+                    view.dispatchTouch(eventTime, eventTime, MotionEvent.ACTION_CANCEL, x, y)
+
+                    // 취소 직후에도 남은 스크롤이 반영될 수 있어 좌표가 멈춘 뒤 기준 위치를 설정합니다.
+                    var lastScrollY = view.scrollY
+                    var lastChangeTime = SystemClock.uptimeMillis()
+                    val deadline = lastChangeTime + ROOT_SCROLL_TIMEOUT_MILLIS
+                    while (SystemClock.uptimeMillis() - lastChangeTime < ROOT_SCROLL_IDLE_MILLIS) {
+                        assertTrue(
+                            "Root scroll did not stop after touch cancellation",
+                            SystemClock.uptimeMillis() < deadline,
+                        )
+                        uiController.loopMainThreadForAtLeast(SWIPE_MOVE_INTERVAL_MILLIS)
+                        if (view.scrollY != lastScrollY) {
+                            lastScrollY = view.scrollY
+                            lastChangeTime = SystemClock.uptimeMillis()
+                        }
+                    }
                     view.scrollTo(0, scrollY)
-                    uiController.loopMainThreadForAtLeast(ROOT_SCROLL_IDLE_MILLIS)
                 }
             },
         )
@@ -483,13 +725,12 @@ class SessionConfigurationContinuityTest {
                     val x = view.width / 2f
                     val startY = view.height * startRatio
                     val endY = view.height * endRatio
-                    dispatchTouch(view, downTime, downTime, MotionEvent.ACTION_DOWN, x, startY)
+                    view.dispatchTouch(downTime, downTime, MotionEvent.ACTION_DOWN, x, startY)
                     uiController.loopMainThreadForAtLeast(SWIPE_MOVE_INTERVAL_MILLIS)
                     repeat(SWIPE_MOVE_COUNT) { index ->
                         val progress = (index + 1f) / SWIPE_MOVE_COUNT
                         val y = startY + ((endY - startY) * progress)
-                        dispatchTouch(
-                            view,
+                        view.dispatchTouch(
                             downTime,
                             SystemClock.uptimeMillis(),
                             MotionEvent.ACTION_MOVE,
@@ -498,8 +739,7 @@ class SessionConfigurationContinuityTest {
                         )
                         uiController.loopMainThreadForAtLeast(SWIPE_MOVE_INTERVAL_MILLIS)
                     }
-                    dispatchTouch(
-                        view,
+                    view.dispatchTouch(
                         downTime,
                         SystemClock.uptimeMillis(),
                         MotionEvent.ACTION_UP,
@@ -512,8 +752,7 @@ class SessionConfigurationContinuityTest {
         )
     }
 
-    private fun dispatchTouch(
-        view: View,
+    private fun View.dispatchTouch(
         downTime: Long,
         eventTime: Long,
         action: Int,
@@ -522,7 +761,7 @@ class SessionConfigurationContinuityTest {
     ) {
         val event = MotionEvent.obtain(downTime, eventTime, action, x, y, 0)
         try {
-            view.dispatchTouchEvent(event)
+            dispatchTouchEvent(event)
         } finally {
             event.recycle()
         }
