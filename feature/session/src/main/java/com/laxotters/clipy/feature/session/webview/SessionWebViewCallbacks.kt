@@ -3,6 +3,12 @@ package com.laxotters.clipy.feature.session.webview
 internal class SessionWebViewCallbacks(
     val onPageFinished: (PageInfo) -> Unit,
     val onRootScrolled: (RootScrollMetrics) -> Unit,
+    val onErrorMessage: (ErrorMessage) -> Unit = {},
+)
+
+internal data class ErrorMessage(
+    val message: String,
+    val key: String,
 )
 
 internal data class PageInfo(

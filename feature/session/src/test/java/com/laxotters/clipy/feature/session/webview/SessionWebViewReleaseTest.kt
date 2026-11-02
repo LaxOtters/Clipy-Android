@@ -15,6 +15,7 @@ class SessionWebViewReleaseTest {
                 calls += "cancel"
                 throw cancellationError
             },
+            closeExternalAction = { calls += "external" },
             detachController = {
                 calls += "detach"
                 throw detachError
@@ -27,7 +28,7 @@ class SessionWebViewReleaseTest {
         val failure = runCatching { release.release() }.exceptionOrNull()
         release.release()
 
-        assertEquals(listOf("cancel", "detach", "callbacks", "remove", "destroy"), calls)
+        assertEquals(listOf("cancel", "external", "detach", "callbacks", "remove", "destroy"), calls)
         assertSame(cancellationError, failure)
         assertEquals(listOf(detachError), failure?.suppressed?.toList())
     }
@@ -41,6 +42,7 @@ class SessionWebViewReleaseTest {
                 calls += "cancel"
                 release.release()
             },
+            closeExternalAction = { calls += "external" },
             detachController = { calls += "detach" },
             releaseCallbacks = { calls += "callbacks" },
             removeFromParent = { calls += "remove" },
@@ -50,6 +52,6 @@ class SessionWebViewReleaseTest {
         release.release()
         release.release()
 
-        assertEquals(listOf("cancel", "detach", "callbacks", "remove", "destroy"), calls)
+        assertEquals(listOf("cancel", "external", "detach", "callbacks", "remove", "destroy"), calls)
     }
 }

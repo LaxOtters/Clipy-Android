@@ -37,8 +37,6 @@ import androidx.test.filters.LargeTest
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.laxotters.clipy.core.designsystem.component.bottomsheet.BottomSheetValue
-import com.laxotters.clipy.core.designsystem.component.dialog.ClipyJsDialogHost
-import com.laxotters.clipy.core.designsystem.component.dialog.rememberClipyJsDialogManager
 import com.laxotters.clipy.core.navigation.Route
 import com.laxotters.clipy.domain.model.BottomSheetState
 import com.laxotters.clipy.feature.session.SessionTopBarState
@@ -341,36 +339,38 @@ class SessionConfigurationContinuityTest {
         composeRule.activityRule.scenario.onActivity { activity ->
             activity.setContent {
                 val controller = rememberSessionWebViewController()
-                val dialogManager = rememberClipyJsDialogManager()
+                val dialogState = rememberSessionWebDialogState()
 
                 SessionWebView(
                     url = initialUrl,
                     controller = controller,
-                    dialogManager = dialogManager,
-                    onPageStateChanged = { url, canGoBack, canGoForward ->
-                        pageState.set(PageState(url = url))
-                        sessionViewModel.dispatch(
-                            SessionUiEvent.PageLoaded(
-                                sessionId = CONFIGURATION_TEST_SESSION_ID,
-                                url = url,
-                                canGoBack = canGoBack,
-                                canGoForward = canGoForward,
-                            ),
-                        )
-                    },
-                    onRootScrolled = { deltaY, scrollableDistance, viewportHeight, touchSlopPx ->
-                        sessionViewModel.dispatch(
-                            SessionUiEvent.WebViewRootScrolled(
-                                deltaY = deltaY,
-                                scrollableDistance = scrollableDistance,
-                                viewportHeight = viewportHeight,
-                                touchSlopPx = touchSlopPx,
-                            ),
-                        )
-                    },
+                    dialogState = dialogState,
+                    callbacks = SessionWebViewCallbacks(
+                        onPageFinished = { pageInfo ->
+                            pageState.set(PageState(url = pageInfo.url))
+                            sessionViewModel.dispatch(
+                                SessionUiEvent.PageLoaded(
+                                    sessionId = CONFIGURATION_TEST_SESSION_ID,
+                                    url = pageInfo.url,
+                                    canGoBack = pageInfo.canGoBack,
+                                    canGoForward = pageInfo.canGoForward,
+                                ),
+                            )
+                        },
+                        onRootScrolled = { metrics ->
+                            sessionViewModel.dispatch(
+                                SessionUiEvent.WebViewRootScrolled(
+                                    deltaY = metrics.deltaY,
+                                    scrollableDistance = metrics.scrollableDistance,
+                                    viewportHeight = metrics.viewportHeight,
+                                    touchSlopPx = metrics.touchSlopPx,
+                                ),
+                            )
+                        },
+                    ),
                     modifier = Modifier.fillMaxSize(),
                 )
-                ClipyJsDialogHost(manager = dialogManager)
+                SessionWebDialogHosts(state = dialogState)
             }
         }
 

@@ -9,4 +9,14 @@
     <string name="session_js_dialog_cancel_action">Cancel</string>
     <string name="session_js_dialog_stay_action">Stay</string>
     <string name="session_js_dialog_leave_action">Leave</string>
+
+    <string name="session_external_app_dialog_title">Open external app?</string>
+    <string name="session_external_app_dialog_named_title">Open in %1$s?</string>
+    <string name="session_external_app_dialog_description">Clipy will open another app to continue.</string>
+    <string name="session_download_dialog_title">Open in browser?</string>
+    <string name="session_download_dialog_description">Downloads aren\'t supported in Clipy.</string>
+    <string name="session_external_action_cancel">Cancel</string>
+    <string name="session_external_action_continue">Continue</string>
+    <string name="session_external_app_failure_message">Couldn\'t open external app</string>
+    <string name="session_download_unsupported_message">Downloads aren\'t supported</string>
 </resources>

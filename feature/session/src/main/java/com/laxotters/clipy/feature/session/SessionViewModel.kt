@@ -54,6 +54,9 @@ class SessionViewModel @AssistedInject constructor(
             )
 
             SessionUiEvent.SystemBackPressed -> resolveSystemBack()
+            is SessionUiEvent.ErrorMessageReceived -> postSideEffect(
+                SessionUiSideEffect.ShowSnackbar(message = event.message, key = event.key),
+            )
         }
     }
 
